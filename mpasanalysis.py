@@ -183,7 +183,7 @@ class MPASOMap(object):
         # add colorbar
         if add_colorbar:
             cb = m.colorbar(fig, ax=axis)
-            cb.formatter.set_powerlimits((-2, 2))
+            cb.formatter.set_powerlimits((-4, 4))
             cb.update_ticks()
         return fig
 
