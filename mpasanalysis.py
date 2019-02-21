@@ -13,12 +13,13 @@ class MPASOMap(object):
 
     """MPASOMap object"""
 
-    def __init__(self, data=None, lon=None, lat=None, name=None, units=None):
+    def __init__(self, data=None, lon=None, lat=None, cellarea=None, name=None, units=None):
         """Initialize MPASOMap
 
         :data: (1D numpy array) data at each location
         :lon: (1D numpy array) longitude
         :lat: (1D numpy array) latitude
+        :cellarea: (1D numpy array) area of cells
         :name: (str) name of variable
         :units: (str) units of variable
 
@@ -26,6 +27,7 @@ class MPASOMap(object):
         self.data = data
         self.lon = lon
         self.lat = lat
+        self.cellarea = cellarea
         self.name = name
         self.units = units
 
@@ -81,8 +83,14 @@ class MPASOMap(object):
             axis = plt.gca()
         # plot map
         if region == 'Global':
+            lon_ll = 20.0
+            lat_ll = -80.0
+            lon_ur = 380.0
+            lat_ur = 80.0
+            lon_c = 0.5*(lon_ll+lon_ur)
+            lat_c = 0.5*(lat_ll+lat_ur)
             # global map
-            m = Basemap(projection='cyl', llcrnrlat=-72, urcrnrlat=72, llcrnrlon=20, urcrnrlon=380, ax=axis)
+            m = Basemap(projection='cyl', llcrnrlat=lat_ll, urcrnrlat=lat_ur, llcrnrlon=lon_ll, urcrnrlon=lon_ur, ax=axis)
             # plot coastlines, draw label meridians and parallels.
             m.drawcoastlines()
             m.drawmapboundary(fill_color='lightgray')
@@ -92,11 +100,12 @@ class MPASOMap(object):
             data = self.data
             lat = self.lat
             lon = self.lon
+            cellarea = self.cellarea
             # shift longitude
             lon = np.where(lon < 20., lon+360., lon)
             x, y = m(lon, lat)
             # marker size
-            markersize = 0.1
+            markersize = 1
         elif region == 'LabSea':
             # regional map for Labrador sea
             lon_ll = 296.0
@@ -118,14 +127,13 @@ class MPASOMap(object):
             data = self.data[region_mask]
             lat = self.lat[region_mask]
             lon = self.lon[region_mask]
+            cellarea = self.cellarea[region_mask]
             x, y = m(lon, lat)
-            # marker size
-            markersize = 1
         elif region == 'test':
             # regional map for test
             lon_ll = 310.0
             lat_ll = 55.0
-            lon_ur = 320.0
+            lon_ur = 350.0
             lat_ur = 65.0
             lon_c = 0.5*(lon_ll+lon_ur)
             lat_c = 0.5*(lat_ll+lat_ur)
@@ -142,11 +150,24 @@ class MPASOMap(object):
             data = self.data[region_mask]
             lat = self.lat[region_mask]
             lon = self.lon[region_mask]
+            cellarea = self.cellarea[region_mask]
             x, y = m(lon, lat)
-            # marker size
-            markersize = 2
         else:
             raise ValueError('Region {} not supported.'.format(region))
+        # dynamically adjust the marker size
+        meancellarea = np.nanmean(cellarea)
+        norm_cellarea = cellarea/meancellarea
+        drlat = (lat_ur-lat_ll)*np.pi/180.0
+        drlon = (lon_ur-lon_ll)*np.pi/180.0
+        rlat_c = lat_c*np.pi/180.0
+        r_earth = 6.37e6
+        area = r_earth**2*np.cos(rlat_c)*drlat*drlon
+        ar = drlat/drlon/np.cos(rlat_c)
+        ar = np.max([ar, 1.0/ar])
+        markersize = meancellarea/area/2.6e-6/ar*norm_cellarea
+        print(np.max(markersize))
+        if np.max(markersize) < 1.0:
+            markersize = 1
         # manually mapping levels to the colormap if levels is passed in,
         # otherwise linear mapping
         if levels is not None:
