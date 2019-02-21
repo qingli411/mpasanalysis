@@ -68,11 +68,12 @@ class MPASOMap(object):
         self.data = np.where(mask.data==0, mask_data, dat)
 
 
-    def plot(self, axis=None, region='Global', levels=None, add_colorbar=True, cmap='rainbow', **kwargs):
+    def plot(self, axis=None, region='Global', levels=None, add_title=True, add_colorbar=True, cmap='rainbow', **kwargs):
         """Plot scatters on a map
 
         :axis: (matplotlib.axes, optional) axis to plot figure on
         :leveles: (list, optional) list of levels
+        :add_title: (bool) do not add title if False
         :add_colorbar: (bool) do not add colorbar if False
         :cmap: (str, optional) colormap
         :**kwargs: (keyword arguments) to be passed to mpl_toolkits.basemap.scatter()
@@ -176,6 +177,9 @@ class MPASOMap(object):
         else:
             # otherwise linear mapping
             fig = m.scatter(x, y, marker='.', s=markersize, c=data, cmap=plt.cm.get_cmap(cmap), **kwargs)
+        # add title
+        if add_title:
+            axis.set_title('{} ({})'.format(self.name, self.units))
         # add colorbar
         if add_colorbar:
             cb = m.colorbar(fig, ax=axis)
