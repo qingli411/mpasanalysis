@@ -2,6 +2,7 @@ import os
 import sys
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.colors as colors
 from netCDF4 import Dataset
 from mpl_toolkits.basemap import Basemap
 
@@ -97,15 +98,7 @@ class MPASOMap(object):
             m.fillcontinents(color='gray',lake_color='lightgray')
             m.drawparallels(np.arange(-90.,91.,30.), labels=[1,0,0,1])
             m.drawmeridians(np.arange(-180.,181.,60.), labels=[1,0,0,1])
-            data = self.data
-            lat = self.lat
-            lon = self.lon
-            cellarea = self.cellarea
-            # shift longitude
-            lon = np.where(lon < 20., lon+360., lon)
-            x, y = m(lon, lat)
-            # marker size
-            markersize = 1
+            region_mask = None
         elif region == 'LabSea':
             # regional map for Labrador sea
             lon_ll = 296.0
@@ -124,16 +117,11 @@ class MPASOMap(object):
             lon_mask = (self.lon >= lon_ll-26.0) & (self.lon <= lon_ur)
             lat_mask = (self.lat >= lat_ll) & (self.lat <= lat_ur+4.0)
             region_mask = lon_mask & lat_mask
-            data = self.data[region_mask]
-            lat = self.lat[region_mask]
-            lon = self.lon[region_mask]
-            cellarea = self.cellarea[region_mask]
-            x, y = m(lon, lat)
         elif region == 'test':
             # regional map for test
             lon_ll = 310.0
             lat_ll = 55.0
-            lon_ur = 350.0
+            lon_ur = 320.0
             lat_ur = 65.0
             lon_c = 0.5*(lon_ll+lon_ur)
             lat_c = 0.5*(lat_ll+lat_ur)
@@ -147,34 +135,46 @@ class MPASOMap(object):
             lon_mask = (self.lon >= lon_ll-26.0) & (self.lon <= lon_ur)
             lat_mask = (self.lat >= lat_ll) & (self.lat <= lat_ur+4.0)
             region_mask = lon_mask & lat_mask
+        else:
+            raise ValueError('Region {} not supported.'.format(region))
+        # apply region mask to data
+        if region_mask is not None:
             data = self.data[region_mask]
             lat = self.lat[region_mask]
             lon = self.lon[region_mask]
             cellarea = self.cellarea[region_mask]
-            x, y = m(lon, lat)
         else:
-            raise ValueError('Region {} not supported.'.format(region))
+            data = self.data
+            lat = self.lat
+            lon = self.lon
+            cellarea = self.cellarea
+            # shift longitude
+            lon = np.where(lon < 20., lon+360., lon)
         # dynamically adjust the marker size
-        meancellarea = np.nanmean(cellarea)
-        norm_cellarea = cellarea/meancellarea
+        cellarea_mean = np.nanmean(cellarea)
+        cellarea_norm = cellarea/cellarea_mean
         drlat = (lat_ur-lat_ll)*np.pi/180.0
         drlon = (lon_ur-lon_ll)*np.pi/180.0
         rlat_c = lat_c*np.pi/180.0
-        r_earth = 6.37e6
+        r_earth = 6.38e6
         area = r_earth**2*np.cos(rlat_c)*drlat*drlon
         ar = drlat/drlon/np.cos(rlat_c)
         ar = np.max([ar, 1.0/ar])
-        markersize = meancellarea/area/2.6e-6/ar*norm_cellarea
-        print(np.max(markersize))
+        markersize = cellarea_mean/area/2.6e-6/ar*cellarea_norm
+        print('Minimum and maximum markersizes: {:4.2f} and {:4.2f}'.format(np.min(markersize), np.max(markersize)))
         if np.max(markersize) < 1.0:
+            print('Set markersize to 1')
             markersize = 1
-        # manually mapping levels to the colormap if levels is passed in,
-        # otherwise linear mapping
+        # plot data on map
+        print('Plotting map of {} at region \'{}\''.format(self.name+' ('+self.units+')', region))
+        x, y = m(lon, lat)
         if levels is not None:
+            # manually mapping levels to the colormap if levels is passed in,
             bounds = np.array(levels)
             norm = colors.BoundaryNorm(boundaries=bounds, ncolors=256)
             fig = m.scatter(x, y, marker='.', s=markersize, c=data, norm=norm, cmap=plt.cm.get_cmap(cmap), **kwargs)
         else:
+            # otherwise linear mapping
             fig = m.scatter(x, y, marker='.', s=markersize, c=data, cmap=plt.cm.get_cmap(cmap), **kwargs)
         # add colorbar
         if add_colorbar:
