@@ -85,78 +85,53 @@ class MPASOMap(object):
             axis = plt.gca()
         # plot map
         if region == 'Global':
+            # global map
             lon_ll = 20.0
             lat_ll = -80.0
             lon_ur = 380.0
             lat_ur = 80.0
-            lon_c = 0.5*(lon_ll+lon_ur)
-            lat_c = 0.5*(lat_ll+lat_ur)
-            # global map
             m = Basemap(projection='cyl', llcrnrlat=lat_ll, urcrnrlat=lat_ur, llcrnrlon=lon_ll, urcrnrlon=lon_ur, ax=axis)
-            # plot coastlines, draw label meridians and parallels.
-            m.drawcoastlines()
-            m.drawmapboundary(fill_color='lightgray')
-            m.fillcontinents(color='gray',lake_color='lightgray')
-            m.drawparallels(np.arange(-90.,91.,30.), labels=[1,0,0,1])
-            m.drawmeridians(np.arange(-180.,181.,60.), labels=[1,0,0,1])
-            region_mask = None
-        elif region == 'LabSea':
-            # regional map for Labrador sea
-            lon_ll = 296.0
-            lat_ll = 36.0
-            lon_ur = 356.0
-            lat_ur = 70.0
-            lon_c = 0.5*(lon_ll+lon_ur)
-            lat_c = 0.5*(lat_ll+lat_ur)
-            m = Basemap(projection='cass', llcrnrlon=lon_ll, llcrnrlat=lat_ll, urcrnrlon=lon_ur, urcrnrlat=lat_ur,
-                        resolution='l', lon_0=lon_c, lat_0=lat_c, ax=axis)
-            m.drawcoastlines()
-            m.drawmapboundary(fill_color='lightgray')
-            m.fillcontinents(color='gray',lake_color='lightgray')
-            m.drawparallels(np.arange(-90.,91.,10.), labels=[1,0,0,1])
-            m.drawmeridians(np.arange(-180.,181.,10.), labels=[1,0,0,1])
-            lon_mask = (self.lon >= lon_ll-26.0) & (self.lon <= lon_ur)
-            lat_mask = (self.lat >= lat_ll) & (self.lat <= lat_ur+4.0)
-            region_mask = lon_mask & lat_mask
-        elif region == 'test':
-            # regional map for test
-            lon_ll = 310.0
-            lat_ll = 55.0
-            lon_ur = 320.0
-            lat_ur = 65.0
-            lon_c = 0.5*(lon_ll+lon_ur)
-            lat_c = 0.5*(lat_ll+lat_ur)
-            m = Basemap(projection='cass', llcrnrlon=lon_ll, llcrnrlat=lat_ll, urcrnrlon=lon_ur, urcrnrlat=lat_ur,
-                        resolution='l', lon_0=lon_c, lat_0=lat_c, ax=axis)
-            m.drawcoastlines()
-            m.drawmapboundary(fill_color='lightgray')
-            m.fillcontinents(color='gray',lake_color='lightgray')
-            m.drawparallels(np.arange(-90.,91.,10.), labels=[1,0,0,1])
-            m.drawmeridians(np.arange(-180.,181.,10.), labels=[1,0,0,1])
-            lon_mask = (self.lon >= lon_ll-26.0) & (self.lon <= lon_ur)
-            lat_mask = (self.lat >= lat_ll) & (self.lat <= lat_ur+4.0)
-            region_mask = lon_mask & lat_mask
-        else:
-            raise ValueError('Region {} not supported.'.format(region))
-        # print message
-        print('Plotting map of {} at region \'{}\''.format(self.name+' ('+self.units+')', region))
-        # apply region mask to data
-        if region_mask is not None:
-            data = self.data[region_mask]
-            lat = self.lat[region_mask]
-            lon = self.lon[region_mask]
-            cellarea = self.cellarea[region_mask]
-        else:
+            # parallels and meridians
+            mdlat = 30.0
+            mdlon = 60.0
+            # markersize
+            markersize = 1
+            # data
             data = self.data
             lat = self.lat
             lon = self.lon
             cellarea = self.cellarea
             # shift longitude
             lon = np.where(lon < 20., lon+360., lon)
-        if region == 'Global':
-            markersize = 1
         else:
-            # automatically adjust the marker size for regional plot
+            # regional map
+            [lon_ll, lat_ll, lon_ur, lat_ur] = region_latlon(region)
+            lon_c = 0.5*(lon_ll+lon_ur)
+            lat_c = 0.5*(lat_ll+lat_ur)
+            m = Basemap(projection='cass', llcrnrlon=lon_ll, llcrnrlat=lat_ll, urcrnrlon=lon_ur, urcrnrlat=lat_ur,
+                        resolution='l', lon_0=lon_c, lat_0=lat_c, ax=axis)
+            # parallels and meridians
+            mdlat = 10.0
+            mdlon = 10.0
+            # region mask
+            lon_mask = (self.lon >= lon_ll-26.0) & (self.lon <= lon_ur)
+            lat_mask = (self.lat >= lat_ll) & (self.lat <= lat_ur+4.0)
+            region_mask = lon_mask & lat_mask
+            # apply region mask to data
+            data = self.data[region_mask]
+            lat = self.lat[region_mask]
+            lon = self.lon[region_mask]
+            cellarea = self.cellarea[region_mask]
+        # print message
+        print('Plotting map of {} at region \'{}\''.format(self.name+' ('+self.units+')', region))
+        # plot coastlines, draw label meridians and parallels.
+        m.drawcoastlines()
+        m.drawmapboundary(fill_color='lightgray')
+        m.fillcontinents(color='gray',lake_color='lightgray')
+        m.drawparallels(np.arange(-90.,91.,mdlat), labels=[1,0,0,1])
+        m.drawmeridians(np.arange(-180.,181.,mdlon), labels=[1,0,0,1])
+        # automatically adjust the marker size for regional plot
+        if region != 'Global':
             plt.gcf().canvas.draw()
             axwidth = m.ax.get_window_extent().width/72.
             axheight = m.ax.get_window_extent().height/72.
@@ -189,6 +164,31 @@ class MPASOMap(object):
             cb.formatter.set_powerlimits((-4, 4))
             cb.update_ticks()
         return fig
+
+
+def region_latlon(region):
+    """Return longitude and latitude of lower left an upper right of the region.
+
+    :region: (string) region name
+    :return: (list) lon_ll, lat_ll, lon_ur, lat_ur
+
+    """
+
+    if region == 'LabSea':
+        # regional map for Labrador sea
+        lon_ll = 296.0
+        lat_ll = 36.0
+        lon_ur = 356.0
+        lat_ur = 70.0
+    elif region == 'test':
+        lon_ll = 310.0
+        lat_ll = 55.0
+        lon_ur = 320.0
+        lat_ur = 65.0
+    else:
+        raise ValueError('Region {} not supported.'.format(region))
+    return [lon_ll, lat_ll, lon_ur, lat_ur]
+
 
 def plot_map(xx, yy, data, axis=None, levels=None, add_colorbar=True, draw_eq=False, cmap='rainbow', **kwargs):
     # use curret axis if not specified
