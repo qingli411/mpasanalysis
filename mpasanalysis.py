@@ -138,6 +138,8 @@ class MPASOMap(object):
             region_mask = lon_mask & lat_mask
         else:
             raise ValueError('Region {} not supported.'.format(region))
+        # print message
+        print('Plotting map of {} at region \'{}\''.format(self.name+' ('+self.units+')', region))
         # apply region mask to data
         if region_mask is not None:
             data = self.data[region_mask]
@@ -151,23 +153,24 @@ class MPASOMap(object):
             cellarea = self.cellarea
             # shift longitude
             lon = np.where(lon < 20., lon+360., lon)
-        # dynamically adjust the marker size
-        cellarea_mean = np.nanmean(cellarea)
-        cellarea_norm = cellarea/cellarea_mean
-        drlat = (lat_ur-lat_ll)*np.pi/180.0
-        drlon = (lon_ur-lon_ll)*np.pi/180.0
-        rlat_c = lat_c*np.pi/180.0
-        r_earth = 6.38e6
-        area = r_earth**2*np.cos(rlat_c)*drlat*drlon
-        ar = drlat/drlon/np.cos(rlat_c)
-        ar = np.max([ar, 1.0/ar])
-        markersize = cellarea_mean/area/2.6e-6/ar*cellarea_norm
-        print('Minimum and maximum markersizes: {:4.2f} and {:4.2f}'.format(np.min(markersize), np.max(markersize)))
-        if np.max(markersize) < 1.0:
-            print('Set markersize to 1')
+        if region == 'Global':
             markersize = 1
+        else:
+            # automatically adjust the marker size for regional plot
+            plt.gcf().canvas.draw()
+            axwidth = m.ax.get_window_extent().width/72.
+            axheight = m.ax.get_window_extent().height/72.
+            axarea = axwidth*axheight
+            cellarea_mean = np.nanmean(cellarea)
+            cellarea_norm = cellarea/cellarea_mean
+            area = m.xmax * m.ymax
+            markersize = cellarea_mean*18000/area*axarea*cellarea_norm
+            markersize[markersize<1.0] = 1.0
+            print('Minimum and maximum markersizes: {:4.2f} and {:4.2f}'.format(np.min(markersize), np.max(markersize)))
+            if np.max(markersize) < 1.0:
+                print('Set markersize to 1')
+                markersize = 1
         # plot data on map
-        print('Plotting map of {} at region \'{}\''.format(self.name+' ('+self.units+')', region))
         x, y = m(lon, lat)
         if levels is not None:
             # manually mapping levels to the colormap if levels is passed in,
