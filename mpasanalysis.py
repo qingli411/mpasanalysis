@@ -7,7 +7,7 @@ from netCDF4 import Dataset
 from mpl_toolkits.basemap import Basemap
 
 #--------------------------------
-# GOMTMap
+# MPASOMap
 #--------------------------------
 
 class MPASOMap(object):
@@ -165,6 +165,35 @@ class MPASOMap(object):
             cb.update_ticks()
         return fig
 
+#--------------------------------
+# MPASOCrossSection
+#--------------------------------
+
+class MPASOCrossSection(object):
+
+    """MPASOCrossSection object"""
+
+    def __init__(self, data=None, lon0=None, lat0=None, lon1=None, lat1=None name=None, units=None):
+        """Initialize MPASOCrossSection
+
+        :data: (1D numpy array) data at each location
+        :lon0: (1D numpy array) longitude of starting point
+        :lat0: (1D numpy array) latitude of starting point
+        :lon1: (1D numpy array) longitude of ending point
+        :lat1: (1D numpy array) latitude of ending point
+        :name: (str) name of variable
+        :units: (str) units of variable
+
+        """
+        self.data = data
+        self.lon = lon
+        self.lat = lat
+        self.name = name
+        self.units = units
+
+#--------------------------------
+# Share functions
+#--------------------------------
 
 def region_latlon(region):
     """Return longitude and latitude of lower left an upper right of the region.
