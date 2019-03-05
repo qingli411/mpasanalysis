@@ -1,5 +1,6 @@
 import os
 import sys
+import calendar
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.colors as colors
@@ -147,10 +148,11 @@ class MPASOMap(object):
         self.data = np.where(mask.data==0, mask_data, dat)
 
 
-    def plot(self, axis=None, region='Global', levels=None, add_title=True, add_colorbar=True, cmap='rainbow', **kwargs):
+    def plot(self, axis=None, region='Global', label=None, levels=None, add_title=True, add_colorbar=True, cmap='rainbow', **kwargs):
         """Plot scatters on a map
 
         :axis: (matplotlib.axes, optional) axis to plot figure on
+        :label: (str) label
         :leveles: (list, optional) list of levels
         :add_title: (bool) do not add title if False
         :add_colorbar: (bool) do not add colorbar if False
@@ -225,6 +227,10 @@ class MPASOMap(object):
             if np.max(markersize) < 1.0:
                 print('Set markersize to 1')
                 markersize = 1
+            if label is not None:
+                axis.text(0.1, 0.67, label, transform=axis.transAxes,
+                    fontsize=14, color='k', fontweight='bold', va='top',
+                    bbox=dict(boxstyle='square',ec='k',fc='w'))
         # plot data on map
         x, y = m(lon, lat)
         if levels is not None:

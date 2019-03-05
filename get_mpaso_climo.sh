@@ -1,8 +1,9 @@
 #!/bin/bash
 
 component="ocn"
-# varname="heatflux"
-varname="temperature"
+varname="heatflux"
+# varname="temperature"
+# varname="mixedLayerDepth"
 
 case "${HOSTNAME}" in
     theta* )
@@ -17,7 +18,7 @@ case "${HOSTNAME}" in
     edison* )
         caseid=edison.20181204.noCNT.A_WCYCL1950S_CMIP6_LRtunedHR.ne30_oECv3_ICG
         drc_out=/global/project/projectdirs/acme/qingli/e3sm_climo
-        drc_in=/global/cscratch1/sd/tang30/ACME_simulations/COSP/edison.20181204.noCNT.A_WCYCL1950S_CMIP6_LRtunedHR.ne30_oECv3_ICG/archive/ocn/hist
+        drc_in=/global/cscratch1/sd/tang30/ACME_simulations/edison.20181204.noCNT.A_WCYCL1950S_CMIP6_LRtunedHR.ne30_oECv3_ICG/archive/ocn/hist
         e3sm_config=/global/project/projectdirs/acme/software/anaconda_envs/load_latest_e3sm_unified_x.sh
         climo_ys=41
         climo_ye=50
@@ -44,7 +45,7 @@ case ${varname} in
     "windStress" )
         varlist="timeMonthly_avg_windStressZonal,timeMonthly_avg_windStressMeridional"
         ;;
-    "mixLayerDepth" )
+    "mixedLayerDepth" )
         varlist="timeMonthly_avg_dThreshMLD,timeMonthly_avg_tThreshMLD"
         ;;
     "temperature" )
@@ -56,17 +57,19 @@ case ${varname} in
     "potentialDensity" )
         varlist="timeMonthly_avg_potentialDensity"
         ;;
+    "velocity" )
+        varlist="timeMonthly_avg_velocityZonal,timeMonthly_avg_velocityMeridional"
 esac
 
-yst_str=$(printf "%04d" ${yst})
-yed_str=$(printf "%04d" ${yed})
-path_out=${drc_out}/${caseid}/${yst_str}-${yed_str}/ocn/${varset}
+ys_str=$(printf "%04d" ${climo_ys})
+ye_str=$(printf "%04d" ${climo_ye})
+path_out=${drc_out}/${caseid}/${ys_str}-${ye_str}/${component}/${varname}
 mkdir -p ${path_out}
 
 model="mpaso"
 
 # climatology
-ncclimo -p serial -v ${varlist} -c ${caseid} -m ${model} -s ${climo_ys} -e ${climo_ye} --seasons=none --dec_md=sdd -i ${drc_in} -o ${drc_out}/${component}/${varset}
+ncclimo -p serial -v ${varlist} -c ${caseid} -m ${model} -s ${climo_ys} -e ${climo_ye} --seasons=none --dec_md=sdd -i ${drc_in} -o ${path_out}
 
 # Time series
 # ncclimo -p serial -v ${varlist} -c ${caseid} -m ${model} -s 6 -e 46 -o $drc_out $drc_in/mpaso.hist.am.timeSeriesStatsMonthly.00??-0?-01.nc
