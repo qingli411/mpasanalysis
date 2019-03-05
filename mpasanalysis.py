@@ -27,7 +27,7 @@ class MPASOVolume(object):
         :units: (str) units of variable
 
         """
-        self.fillvalue = -1.e30
+        self.fillvalue = -9.99999979021476795361e+33
         self.data = np.where(data<=self.fillvalue, np.nan, data)
         self.lon = lon
         self.lat = lat
