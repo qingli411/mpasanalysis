@@ -148,12 +148,14 @@ class MPASOMap(object):
         self.data = np.where(mask.data==0, mask_data, dat)
 
 
-    def plot(self, axis=None, region='Global', label=None, levels=None, add_title=True, add_colorbar=True, cmap='rainbow', **kwargs):
+    def plot(self, axis=None, region='Global', ptype='scatter', levels=None,
+             label=None, add_title=True, add_colorbar=True, cmap='rainbow', **kwargs):
         """Plot scatters on a map
 
         :axis: (matplotlib.axes, optional) axis to plot figure on
-        :label: (str) label
+        :ptype: (str) plot type, scatter, contourf etc.
         :leveles: (list, optional) list of levels
+        :label: (str) label
         :add_title: (bool) do not add title if False
         :add_colorbar: (bool) do not add colorbar if False
         :cmap: (str, optional) colormap
@@ -171,7 +173,8 @@ class MPASOMap(object):
             lat_ll = -80.0
             lon_ur = 380.0
             lat_ur = 80.0
-            m = Basemap(projection='cyl', llcrnrlat=lat_ll, urcrnrlat=lat_ur, llcrnrlon=lon_ll, urcrnrlon=lon_ur, ax=axis)
+            m = Basemap(projection='cyl', llcrnrlat=lat_ll, urcrnrlat=lat_ur,
+                    llcrnrlon=lon_ll, urcrnrlon=lon_ur, ax=axis)
             # parallels and meridians
             mdlat = 30.0
             mdlon = 60.0
@@ -190,8 +193,8 @@ class MPASOMap(object):
             lon_ll, lat_ll, lon_ur, lat_ur = region_obj.lon_ll, region_obj.lat_ll, region_obj.lon_ur, region_obj.lat_ur
             lon_c = 0.5*(lon_ll+lon_ur)
             lat_c = 0.5*(lat_ll+lat_ur)
-            m = Basemap(projection='cass', llcrnrlon=lon_ll, llcrnrlat=lat_ll, urcrnrlon=lon_ur, urcrnrlat=lat_ur,
-                        resolution='l', lon_0=lon_c, lat_0=lat_c, ax=axis)
+            m = Basemap(projection='cass', llcrnrlon=lon_ll, llcrnrlat=lat_ll,
+                    urcrnrlon=lon_ur, urcrnrlat=lat_ur, resolution='l', lon_0=lon_c, lat_0=lat_c, ax=axis)
             # parallels and meridians
             mdlat = 10.0
             mdlon = 10.0
@@ -212,35 +215,47 @@ class MPASOMap(object):
         m.fillcontinents(color='gray',lake_color='lightgray')
         m.drawparallels(np.arange(-90.,91.,mdlat), labels=[1,0,0,1])
         m.drawmeridians(np.arange(-180.,181.,mdlon), labels=[1,0,0,1])
-        # automatically adjust the marker size for regional plot
-        if region != 'Global':
-            plt.gcf().canvas.draw()
-            axwidth = m.ax.get_window_extent().width/72.
-            axheight = m.ax.get_window_extent().height/72.
-            axarea = axwidth*axheight
-            cellarea_mean = np.nanmean(cellarea)
-            cellarea_norm = cellarea/cellarea_mean
-            area = m.xmax * m.ymax
-            markersize = cellarea_mean*18000/area*axarea*cellarea_norm
-            markersize[markersize<1.0] = 1.0
-            print('Minimum and maximum markersizes: {:4.2f} and {:4.2f}'.format(np.min(markersize), np.max(markersize)))
-            if np.max(markersize) < 1.0:
-                print('Set markersize to 1')
-                markersize = 1
-            if label is not None:
-                axis.text(0.1, 0.67, label, transform=axis.transAxes,
-                    fontsize=14, color='k', fontweight='bold', va='top',
-                    bbox=dict(boxstyle='square',ec='k',fc='w'))
-        # plot data on map
-        x, y = m(lon, lat)
         if levels is not None:
             # manually mapping levels to the colormap if levels is passed in,
             bounds = np.array(levels)
             norm = colors.BoundaryNorm(boundaries=bounds, ncolors=256)
-            fig = m.scatter(x, y, marker='.', s=markersize, c=data, norm=norm, cmap=plt.cm.get_cmap(cmap), **kwargs)
         else:
-            # otherwise linear mapping
-            fig = m.scatter(x, y, marker='.', s=markersize, c=data, cmap=plt.cm.get_cmap(cmap), **kwargs)
+            norm = None
+        # plot type
+        if ptype == 'scatter':
+            # scatter plot
+            if region != 'Global':
+                # automatically adjust the marker size for regional plot
+                plt.gcf().canvas.draw()
+                axwidth = m.ax.get_window_extent().width/72.
+                axheight = m.ax.get_window_extent().height/72.
+                axarea = axwidth*axheight
+                cellarea_mean = np.nanmean(cellarea)
+                cellarea_norm = cellarea/cellarea_mean
+                area = m.xmax * m.ymax
+                markersize = cellarea_mean*18000/area*axarea*cellarea_norm
+                markersize[markersize<1.0] = 1.0
+                print('Minimum and maximum markersizes: {:4.2f} and {:4.2f}'.
+                        format(np.min(markersize), np.max(markersize)))
+                if np.max(markersize) < 1.0:
+                    print('Set markersize to 1')
+                    markersize = 1
+            # plot data on map
+            x, y = m(lon, lat)
+            fig = m.scatter(x, y, marker='.', s=markersize, c=data,
+                        norm=norm, cmap=plt.cm.get_cmap(cmap), **kwargs)
+        elif ptype == 'contourf':
+            # contour plot
+            fig = m.contourf(lon, lat, data, tri=True, latlon=True, levels=levels,
+                        norm=norm, cmap=plt.cm.get_cmap(cmap), **kwargs)
+        else:
+            raise ValueError('Plot type {} not supported.'.format(ptype))
+        # add label
+        if label is not None:
+            if region == 'LabSea':
+                axis.text(0.1, 0.67, label, transform=axis.transAxes,
+                    fontsize=14, color='k', fontweight='bold', va='top',
+                    bbox=dict(boxstyle='square',ec='k',fc='w'))
         # add title
         if add_title:
             axis.set_title('{} ({})'.format(self.name, self.units))
@@ -283,6 +298,7 @@ class MPASOVertCrossSection(object):
         """Plot scatters on a map
 
         :axis: (matplotlib.axes, optional) axis to plot figure on
+        :ptype: (str) plot type, contourf, pcolor etc.
         :leveles: (list, optional) list of levels
         :add_title: (bool) do not add title if False
         :add_colorbar: (bool) do not add colorbar if False
@@ -294,15 +310,19 @@ class MPASOVertCrossSection(object):
         # use curret axis if not specified
         if axis is None:
             axis = plt.gca()
-        if levels:
+        if levels is not None:
             bounds = np.array(levels)
             norm = colors.BoundaryNorm(boundaries=bounds, ncolors=256)
         else:
             norm = None
         if ptype == 'pcolor':
-            fig = axis.pcolor(self.dist, self.depth, np.transpose(self.data), norm=norm, cmap=plt.cm.get_cmap(cmap), **kwargs)
+            fig = axis.pcolor(self.dist, self.depth, np.transpose(self.data),
+                    norm=norm, cmap=plt.cm.get_cmap(cmap), **kwargs)
         elif ptype == 'contourf':
-            fig = axis.contourf(self.dist, self.depth, np.transpose(self.data), norm=norm, cmap=plt.cm.get_cmap(cmap),  **kwargs)
+            fig = axis.contourf(self.dist, self.depth, np.transpose(self.data), levels=levels,
+                    norm=norm, cmap=plt.cm.get_cmap(cmap), **kwargs)
+        else:
+            raise ValueError('Plot type {} not supported.'.format(ptype))
 
         axis.set_xlabel('Distance (km)')
         axis.set_ylabel('Depth (m)')
