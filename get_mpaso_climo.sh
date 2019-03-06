@@ -1,9 +1,7 @@
 #!/bin/bash
 
+varname=$1
 component="ocn"
-varname="heatflux"
-# varname="temperature"
-# varname="mixedLayerDepth"
 
 case "${HOSTNAME}" in
     theta* )
