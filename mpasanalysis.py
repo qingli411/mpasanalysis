@@ -64,14 +64,15 @@ class MPASOVolume(object):
 
         """
         # automatically adjust number of points
-        d = distance(lon0, lat0, lon1, lat1)
+        d = gc_distance(lon0, lat0, lon1, lat1)
         d_cell = np.sqrt(self.cellarea.mean())
         npoints = int(np.ceil(d/d_cell*1000))
         print('Nearest neighbor interpolation to {} points.'.format(npoints))
-        xx = np.linspace(lon0, lon1, npoints)
-        yy = np.linspace(lat0, lat1, npoints)
+        loni, lati = gc_interpolate(lon0, lat0, lon1, lat1, npoints)
+        # adjust lon in range [0, 360)
+        loni = np.where(loni<0.0, loni+360.0, loni)
         # select nearest neighbor
-        pts = np.array(list(zip(xx,yy)))
+        pts = np.array(list(zip(loni,lati)))
         tree = spatial.KDTree(list(zip(self.lon, self.lat)))
         p = tree.query(pts)
         cidx = p[1]
@@ -82,8 +83,8 @@ class MPASOVolume(object):
         # calculate distance from [lon0, lat0]
         dist = np.zeros(npoints)
         for i in np.arange(npoints-1):
-            dist[i+1] = distance(lon0, lat0, xx[i+1], yy[i+1])
-        obj = MPASOVertCrossSection(data=data, lon=xx, lat=yy, dist=dist, depth=depth, name=self.name, units=self.units)
+            dist[i+1] = gc_distance(lon0, lat0, loni[i+1], lati[i+1])
+        obj = MPASOVertCrossSection(data=data, lon=loni, lat=lati, dist=dist, depth=depth, name=self.name, units=self.units)
         return obj
 
 #--------------------------------
@@ -370,20 +371,63 @@ def region_latlon(region_name):
         raise ValueError('Region {} not supported.'.format(region_name))
     return region
 
-def distance(lon0, lat0, lon1, lat1):
-    """Calculate the distance between two points on Earth.
-    https://stackoverflow.com/questions/19412462/getting-distance-between-two-points-based-on-latitude-longitude
+def gc_radius():
+    """Return the radius of Earth
+    :returns: (float) radius of Earth in km
 
     """
-    radius = 6371  # km
-    dlat = np.radians(lat1 - lat0)
-    dlon = np.radians(lon1 - lon0)
-    a = (np.sin(dlat / 2) * np.sin(dlat / 2) +
-         np.cos(np.radians(lat0)) * np.cos(np.radians(lat1)) *
-         np.sin(dlon / 2) * np.sin(dlon / 2))
+    return 6371.0
+
+def gc_distance(lon0, lat0, lon1, lat1):
+    """Calculate the great circle distance (km) between two points [lon0, lat0] and [lon1, lat1]
+    http://www.movable-type.co.uk/scripts/latlong.html
+
+    :lon0: (float) longitude of point 1 in degrees
+    :lat0: (float) longitude of point 1 in degrees
+    :lon1: (float) longitude of point 2 in degrees
+    :lat1: (float) longitude of point 2 in degrees
+    :returns: (numpy array) longitude and latitude
+
+    """
+    radius = gc_radius() # km
+    dlat_r = np.radians(lat1 - lat0)
+    dlon_r = np.radians(lon1 - lon0)
+    lat0_r = np.radians(lat0)
+    lat1_r = np.radians(lat1)
+    a = (np.sin(dlat_r / 2) * np.sin(dlat_r / 2) +
+         np.cos(lat0_r) * np.cos(lat1_r) *
+         np.sin(dlon_r / 2) * np.sin(dlon_r / 2))
     c = 2 * np.arctan2(np.sqrt(a), np.sqrt(1 - a))
     d = radius * c
     return d
+
+def gc_interpolate(lon0, lat0, lon1, lat1, npoints):
+    """Interpolate on a great circle between two points [lon0, lat0] and [lon1, lat1]
+    http://www.movable-type.co.uk/scripts/latlong.html
+
+    :lon0: (float) longitude of point 1 in degrees
+    :lat0: (float) longitude of point 1 in degrees
+    :lon1: (float) longitude of point 2 in degrees
+    :lat1: (float) longitude of point 2 in degrees
+    :npoints: (int) number of points for interpolation
+    :returns: (numpy array) longitude and latitude
+
+    """
+    radius = gc_radius() # km
+    frac = np.linspace(0, 1, npoints)
+    lon0_r = np.radians(lon0)
+    lat0_r = np.radians(lat0)
+    lon1_r = np.radians(lon1)
+    lat1_r = np.radians(lat1)
+    delta = gc_distance(lon0, lat0, lon1, lat1) / radius
+    a = np.sin((1 - frac) * delta) / np.sin(delta)
+    b = np.sin(frac * delta) / np.sin(delta)
+    x = a * np.cos(lat0_r) * np.cos(lon0_r) + b * np.cos(lat1_r) * np.cos(lon1_r)
+    y = a * np.cos(lat0_r) * np.sin(lon0_r) + b * np.cos(lat1_r) * np.sin(lon1_r)
+    z = a * np.sin(lat0_r) + b * np.sin(lat1_r)
+    lat_out = np.arctan2(z, np.sqrt(x**2 + y**2))
+    lon_out = np.arctan2(y, x)
+    return np.degrees(lon_out), np.degrees(lat_out)
 
 def plot_map(xx, yy, data, axis=None, levels=None, add_colorbar=True, draw_eq=False, cmap='rainbow', **kwargs):
     # use curret axis if not specified
