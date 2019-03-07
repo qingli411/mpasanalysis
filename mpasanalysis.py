@@ -47,7 +47,8 @@ class MPASOVolume(object):
         # get z index
         zidx = np.argmin(np.abs(self.depth-depth))
         # MPASOMap object
-        obj = MPASOMap(data=self.data[:,zidx], lon=self.lon, lat=self.lat, cellarea=self.cellarea, name=self.name, units=self.units)
+        name = self.name+' at {:6.2f} m'.format(self.depth[zidx])
+        obj = MPASOMap(data=self.data[:,zidx], lon=self.lon, lat=self.lat, cellarea=self.cellarea, name=name, units=self.units)
         return obj
 
     def get_vertical_cross_section(self, lon0, lat0, lon1, lat1, depth_bottom=5000.0, depth_top=0.0):
@@ -295,11 +296,12 @@ class MPASOVertCrossSection(object):
         self.name = name
         self.units = units
 
-    def plot(self, axis=None, ptype='contourf', levels=None, add_title=True, add_colorbar=True, cmap='rainbow', **kwargs):
+    def plot(self, axis=None, ptype='contourf', depth_mode='linear', levels=None, add_title=True, add_colorbar=True, cmap='rainbow', **kwargs):
         """Plot scatters on a map
 
         :axis: (matplotlib.axes, optional) axis to plot figure on
         :ptype: (str) plot type, contourf, pcolor etc.
+        :depth_mode: (str) 'linear', 'native' (native grid) or 'symlog' (linear above 100 m and log below)
         :leveles: (list, optional) list of levels
         :add_title: (bool) do not add title if False
         :add_colorbar: (bool) do not add colorbar if False
@@ -311,20 +313,47 @@ class MPASOVertCrossSection(object):
         # use curret axis if not specified
         if axis is None:
             axis = plt.gca()
+        # levels
         if levels is not None:
             bounds = np.array(levels)
             norm = colors.BoundaryNorm(boundaries=bounds, ncolors=256)
         else:
             norm = None
+        # depth mode
+        if depth_mode == 'native':
+            depth = np.arange(self.depth.size)
+        elif depth_mode == 'symlog':
+            depth = self.depth
+        elif depth_mode == 'linear':
+            depth = self.depth
+        else:
+            print('Depth mode \'{}\' not supported, using \'linear\' instead.'.format(depth_mode))
+            depth = self.depth
+        # plot type
         if ptype == 'pcolor':
-            fig = axis.pcolor(self.dist, self.depth, np.transpose(self.data),
+            fig = axis.pcolor(self.dist, depth, np.transpose(self.data),
                     norm=norm, cmap=plt.cm.get_cmap(cmap), **kwargs)
         elif ptype == 'contourf':
-            fig = axis.contourf(self.dist, self.depth, np.transpose(self.data), levels=levels,
+            fig = axis.contourf(self.dist, depth, np.transpose(self.data), levels=levels,
                     norm=norm, cmap=plt.cm.get_cmap(cmap), **kwargs)
         else:
             raise ValueError('Plot type {} not supported.'.format(ptype))
-
+        # update depth scale
+        if depth_mode == 'native':
+            ndepth = self.depth.size
+            plt.gcf().canvas.draw()
+            ticks = [item.get_text() for item in axis.get_yticklabels()]
+            idx = [int(item) for item in ticks]
+            depth_label = [str(int(round(self.depth[item]))) for item in idx if item < ndepth]
+            axis.set_yticklabels(depth_label)
+        elif depth_mode == 'symlog':
+            axis.set_yscale('symlog', linthreshy=100)
+            axis.axhline(y=100, linewidth=0.5, color='k')
+            ylims = axis.get_ylim()
+            axis.set_ylim([0, ylims[1]])
+            ticks = [20, 40, 60, 80, 100, 500, 1000, 2000]
+            ticks_new = [item for item in ticks if item < self.depth[-1]]
+            axis.set_yticks(ticks_new)
         axis.set_xlabel('Distance (km)')
         axis.set_ylabel('Depth (m)')
         axis.invert_yaxis()
@@ -351,7 +380,7 @@ class regionMap(object):
         self.lat_ur = lat_ur
 
 #--------------------------------
-# Share functions
+# Functions
 #--------------------------------
 
 def region_latlon(region_name):

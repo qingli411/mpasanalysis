@@ -33,7 +33,7 @@ def load_paths_ocn(climo_ys=41, climo_ye=50):
         # for testing
         data_root = os.environ['HOME']+'/data/mpas/test'
         climo_root = data_root+'/climo'
-        fig_root = os.environ['HOME']+'/work/e3sm_res_cmp/figures/low_res'
+        fig_root = os.environ['HOME']+'/work/e3sm_res_cmp/figures/test'
         rst_root = data_root
         mon_root = data_root
     else:
