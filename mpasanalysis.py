@@ -107,7 +107,8 @@ class MPASOMap(object):
         :units: (str) units of variable
 
         """
-        self.data = data
+        self.fillvalue = -9.99999979021476795361e+33
+        self.data = np.where(data<=self.fillvalue, np.nan, data)
         self.lon = lon
         self.lat = lat
         self.cellarea = cellarea
@@ -149,12 +150,46 @@ class MPASOMap(object):
         dat = self.data
         self.data = np.where(mask.data==0, mask_data, dat)
 
+    def mean(self, region='Global', lon_min=None, lat_min=None, lon_max=None, lat_max=None):
+        """Area average over a region
+
+        :region: (str) region name
+        :returns: (float) mean value
+
+        """
+        data_mask = ~np.isnan(self.data)
+        data = self.data[data_mask]
+        lon = self.lon[data_mask]
+        lat = self.lat[data_mask]
+        cellarea = self.cellarea[data_mask]
+        if region == 'Global':
+            mean = np.sum(data*cellarea)/np.sum(cellarea)
+        else:
+            if region == 'Custom':
+                assert all(x is not None for x in [lon_min, lat_min, lon_max, lat_max]),\
+                    "Provide lon_min, lat_min, lon_max, and lat_max to customize region"
+                lon_ll, lat_ll, lon_ur, lat_ur = lon_min, lat_min, lon_max, lat_max
+            else:
+                # region mask
+                region_obj = region_latlon(region)
+                lon_ll, lat_ll, lon_ur, lat_ur = region_obj.lon_ll, region_obj.lat_ll, region_obj.lon_ur, region_obj.lat_ur
+            lon_mask = (lon >= lon_ll) & (lon <= lon_ur)
+            lat_mask = (lat >= lat_ll) & (lat <= lat_ur)
+            region_mask = lon_mask & lat_mask
+            # apply region mask to data
+            data = data[region_mask]
+            lat = lat[region_mask]
+            lon = lon[region_mask]
+            cellarea = cellarea[region_mask]
+            mean = np.sum(data*cellarea)/np.sum(cellarea)
+        return mean
 
     def plot(self, axis=None, region='Global', ptype='scatter', levels=None,
              label=None, add_title=True, add_colorbar=True, cmap='rainbow', **kwargs):
         """Plot scatters on a map
 
         :axis: (matplotlib.axes, optional) axis to plot figure on
+        :region: (str) region name
         :ptype: (str) plot type, scatter, contourf etc.
         :leveles: (list, optional) list of levels
         :label: (str) label
@@ -225,7 +260,7 @@ class MPASOMap(object):
             norm = None
         # plot type
         if ptype == 'scatter':
-            # scatter plot
+            # marker size
             if region != 'Global':
                 # automatically adjust the marker size for regional plot
                 plt.gcf().canvas.draw()
@@ -242,11 +277,16 @@ class MPASOMap(object):
                 if np.max(markersize) < 1.0:
                     print('Set markersize to 1')
                     markersize = 1
-            # plot data on map
+            # plot scatter on map
             x, y = m(lon, lat)
             fig = m.scatter(x, y, marker='.', s=markersize, c=data,
                         norm=norm, cmap=plt.cm.get_cmap(cmap), **kwargs)
         elif ptype == 'contourf':
+            # remove nan
+            data_mask = ~np.isnan(data)
+            data = data[data_mask]
+            lon = lon[data_mask]
+            lat = lat[data_mask]
             # contour plot
             fig = m.contourf(lon, lat, data, tri=True, latlon=True, levels=levels,
                         norm=norm, cmap=plt.cm.get_cmap(cmap), **kwargs)
@@ -267,6 +307,7 @@ class MPASOMap(object):
             cb.formatter.set_powerlimits((-4, 4))
             cb.update_ticks()
         return m
+
 
 #--------------------------------
 # MPASOVertCrossSection
@@ -371,7 +412,7 @@ class MPASOVertCrossSection(object):
 # Region object
 #--------------------------------
 
-class regionMap(object):
+class region(object):
     """ Region object"""
     def __init__(self, lon_ll, lat_ll, lon_ur, lat_ur):
         self.lon_ll = lon_ll
@@ -393,12 +434,14 @@ def region_latlon(region_name):
 
     if region_name == 'LabSea':
         # regional map for Labrador sea
-        region = regionMap(lon_ll=296.0, lat_ll=36.0, lon_ur=356.0, lat_ur=70.0)
+        rg = region(lon_ll=296.0, lat_ll=36.0, lon_ur=356.0, lat_ur=70.0)
+    elif region_name == 'LabSea_SD1':
+        rg = region(lon_ll=305.0, lat_ll=55.0, lon_ur=325.0, lat_ur=60.0)
     elif region_name == 'test':
-        region = regionMap(lon_ll=310.0, lat_ll=55.0, lon_ur=320.0, lat_ur=65.0)
+        rg = region(lon_ll=310.0, lat_ll=55.0, lon_ur=320.0, lat_ur=65.0)
     else:
         raise ValueError('Region {} not supported.'.format(region_name))
-    return region
+    return rg
 
 def gc_radius():
     """Return the radius of Earth
