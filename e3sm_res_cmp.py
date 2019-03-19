@@ -38,6 +38,7 @@ def load_paths_ocn(climo_ys=41, climo_ye=50, ts_ys=1, ts_ye=50):
         # for testing
         data_root = os.environ['HOME']+'/data/mpas/test'
         climo_root = data_root+'/climo'
+        ts_root = data_root+'/ts'
         fig_root = os.environ['HOME']+'/work/e3sm_res_cmp/figures/test'
         rst_root = data_root
         mon_root = data_root
