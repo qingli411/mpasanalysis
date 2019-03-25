@@ -34,6 +34,14 @@ def load_paths_ocn(climo_ys=41, climo_ye=50, ts_ys=1, ts_ye=50):
         fig_root = os.environ['HOME']+'/work/e3sm_res_cmp/figures/low_res/{:04d}-{:04d}'.format(climo_ys+yshift, climo_ye+yshift)
         rst_root = data_root+'/run'
         mon_root = data_root+'/archive/ocn/hist'
+    elif 'blogin' in hostname:
+        yshift = 0
+        data_root = '/lcrc/group/acme/jwolfe/acme_scratch/anvil/20190212.A_WCYCL1950S_CMIP6_LRtunedHR-noCNT.ne30_oECv3_ICG.anvil'
+        climo_root = '/lcrc/group/acme/qingli/e3sm_climo/20190212.A_WCYCL1950S_CMIP6_LRtunedHR-noCNT.ne30_oECv3_ICG.anvil/{:04d}-{:04d}/ocn'.format(climo_ys+yshift, climo_ye+yshift)
+        ts_root = '/lcrc/group/acme/qingli/e3sm_climo/20190212.A_WCYCL1950S_CMIP6_LRtunedHR-noCNT.ne30_oECv3_ICG.anvil/{:04d}-{:04d}/ocn'.format(ts_ys+yshift, ts_ye+yshift)
+        fig_root = os.environ['HOME']+'/work/e3sm_res_cmp/figures/low_res-noSI/{:04d}-{:04d}'.format(climo_ys+yshift, climo_ye+yshift)
+        rst_root = data_root+'/run'
+        mon_root = data_root+'/run'
     elif 'pn1803144' in hostname:
         # for testing
         data_root = os.environ['HOME']+'/data/mpas/test'
@@ -43,7 +51,7 @@ def load_paths_ocn(climo_ys=41, climo_ye=50, ts_ys=1, ts_ye=50):
         rst_root = data_root
         mon_root = data_root
     else:
-        raise EnvironmentError('This script should be executed on edison, theta or pn1803144')
+        raise EnvironmentError('This script should be executed on edison, theta, blues or pn1803144')
     os.makedirs(fig_root, exist_ok=True)
     path = {'rst_root': rst_root,
             'mon_root': mon_root,
