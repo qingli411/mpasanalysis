@@ -230,8 +230,7 @@ class MPASOMap(object):
             lon_ll, lat_ll, lon_ur, lat_ur = region_obj.lon_ll, region_obj.lat_ll, region_obj.lon_ur, region_obj.lat_ur
             lon_c = 0.5*(lon_ll+lon_ur)
             lat_c = 0.5*(lat_ll+lat_ur)
-            # m = Basemap(projection='cass', llcrnrlon=lon_ll, llcrnrlat=lat_ll,
-            m = Basemap(projection='stere', llcrnrlon=lon_ll, llcrnrlat=lat_ll,
+            m = Basemap(projection='cass', llcrnrlon=lon_ll, llcrnrlat=lat_ll,
                     urcrnrlon=lon_ur, urcrnrlat=lat_ur, resolution='l', lon_0=lon_c, lat_0=lat_c, ax=axis)
             # parallels and meridians
             mdlat = 10.0
@@ -284,7 +283,7 @@ class MPASOMap(object):
                         norm=norm, cmap=plt.cm.get_cmap(cmap), **kwargs)
         elif ptype == 'contourf':
             x, y = m(lon, lat)
-            fig = m.contourf(x, y, data, tri=True, levels=levels,
+            fig = m.contourf(x, y, data, tri=True, levels=levels, extend='both',
                         norm=norm, cmap=plt.cm.get_cmap(cmap), **kwargs)
         else:
             raise ValueError('Plot type {} not supported.'.format(ptype))
@@ -384,7 +383,7 @@ class MPASOVertCrossSection(object):
             fig = axis.pcolor(self.dist, depth, np.transpose(self.data),
                     norm=norm, cmap=plt.cm.get_cmap(cmap), **kwargs)
         elif ptype == 'contourf':
-            fig = axis.contourf(self.dist, depth, np.transpose(self.data), levels=levels,
+            fig = axis.contourf(self.dist, depth, np.transpose(self.data), levels=levels, extend='both',
                     norm=norm, cmap=plt.cm.get_cmap(cmap), **kwargs)
         else:
             raise ValueError('Plot type {} not supported.'.format(ptype))

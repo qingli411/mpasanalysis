@@ -84,7 +84,11 @@ ye_str=$(printf "%04d" ${climo_ye})
 path_out=${drc_out}/${caseid}/${ys_str}-${ye_str}/${component}/${varname}
 mkdir -p ${path_out}
 
-model="mpaso"
+if [[ ${component} == "ocn" ]]; then
+    model="mpaso"
+elif [[ ${component} == "ice" ]]; then
+    model="mpascice"
+fi
 
 # climatology
 if [[ ${climo_ys} == ${climo_ye} ]]; then
@@ -92,8 +96,8 @@ if [[ ${climo_ys} == ${climo_ye} ]]; then
     yyyy=$(printf %04d ${climo_ys})
     for i in {1..12}; do
         mm=$(printf %02d ${i})
-        ncks -O -v ${varlist} ${drc_in}/mpaso.hist.am.timeSeriesStatsMonthly.${yyyy}-${mm}-01.nc ${path_out}/mpaso_${mm}_${yyyy}${mm}_${yyyy}${mm}_climo.nc
-        ln -sf ${path_out}/mpaso_${mm}_${yyyy}${mm}_${yyyy}${mm}_climo.nc ${path_out}/mpaso_${mm}_climo.nc
+        ncks -O -v ${varlist} ${drc_in}/${model}.hist.am.timeSeriesStatsMonthly.${yyyy}-${mm}-01.nc ${path_out}/${model}_${mm}_${yyyy}${mm}_${yyyy}${mm}_climo.nc
+        ln -sf ${path_out}/${model}_${mm}_${yyyy}${mm}_${yyyy}${mm}_climo.nc ${path_out}/${model}_${mm}_climo.nc
     done
 else
     ncclimo -p serial -v ${varlist} -c ${caseid} -m ${model} -s ${climo_ys} -e ${climo_ye} --seasons=none --dec_md=sdd -i ${drc_in} -o ${path_out}

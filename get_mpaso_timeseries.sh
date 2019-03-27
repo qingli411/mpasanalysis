@@ -88,7 +88,11 @@ ye_str=$(printf "%04d" ${ts_ye})
 path_out=${drc_out}/${caseid}/${ys_str}-${ye_str}/${component}/${varname}
 mkdir -p ${path_out}
 
-model="mpaso"
-
 # Time series
-ncclimo -p serial -v ${varlist} -c ${caseid} -m ${model} -s ${ts_ys} -e ${ts_ye} -o ${path_out} ${drc_in}/mpaso.hist.am.timeSeriesStatsMonthly.00??-??-01.nc
+if [[ ${component} == "ocn" ]]; then
+    model="mpaso"
+elif [[ ${component} == "ice" ]]; then
+    model="mpascice"
+fi
+ncclimo -p serial -v ${varlist} -c ${caseid} -m ${model} -s ${ts_ys} -e ${ts_ye} -o ${path_out} ${drc_in}/${model}.hist.am.timeSeriesStatsMonthly.00??-??-01.nc
+
