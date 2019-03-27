@@ -1,7 +1,50 @@
 #!/bin/bash
 
 varname=$1
-component="ocn"
+# variables
+case ${varname} in
+    "heatFlux" )
+        varlist="timeMonthly_avg_sensibleHeatFlux,timeMonthly_avg_latentHeatFlux,timeMonthly_avg_shortWaveHeatFlux,timeMonthly_avg_longWaveHeatFluxUp,timeMonthly_avg_longWaveHeatFluxDown"
+        component="ocn"
+        ;;
+    "freshWaterFlux" )
+        varlist="timeMonthly_avg_evaporationFlux,timeMonthly_avg_rainFlux,timeMonthly_avg_snowFlux,timeMonthly_avg_seaIceSalinityFlux,timeMonthly_avg_seaIceFreshWaterFlux,timeMonthly_avg_riverRunoffFlux,timeMonthly_avg_iceRunoffFlux"
+        component="ocn"
+        ;;
+    "windStress" )
+        varlist="timeMonthly_avg_windStressZonal,timeMonthly_avg_windStressMeridional"
+        component="ocn"
+        ;;
+    "mixedLayerDepth" )
+        varlist="timeMonthly_avg_dThreshMLD,timeMonthly_avg_tThreshMLD"
+        component="ocn"
+        ;;
+    "temperature" )
+        varlist="timeMonthly_avg_activeTracers_temperature"
+        component="ocn"
+        ;;
+    "salinity" )
+        varlist="timeMonthly_avg_activeTracers_salinity"
+        component="ocn"
+        ;;
+    "potentialDensity" )
+        varlist="timeMonthly_avg_potentialDensity"
+        component="ocn"
+        ;;
+    "velocity" )
+        varlist="timeMonthly_avg_velocityZonal,timeMonthly_avg_velocityMeridional"
+        component="ocn"
+        ;;
+    "iceFraction" )
+        varlist="timeMonthly_avg_iceAreaCell"
+        component="ice"
+        ;;
+    "iceThickness" )
+        varlist="timeMonthly_avg_iceVolumeCell"
+        component="ice"
+        ;;
+esac
+
 
 case "${HOSTNAME}" in
     theta* )
@@ -16,7 +59,7 @@ case "${HOSTNAME}" in
     edison* )
         caseid=edison.20181204.noCNT.A_WCYCL1950S_CMIP6_LRtunedHR.ne30_oECv3_ICG
         drc_out=/global/project/projectdirs/acme/qingli/e3sm_ts
-        drc_in=/global/cscratch1/sd/tang30/ACME_simulations/edison.20181204.noCNT.A_WCYCL1950S_CMIP6_LRtunedHR.ne30_oECv3_ICG/archive/ocn/hist
+        drc_in=/global/cscratch1/sd/tang30/ACME_simulations/edison.20181204.noCNT.A_WCYCL1950S_CMIP6_LRtunedHR.ne30_oECv3_ICG/archive/${component}/hist
         e3sm_config=/global/project/projectdirs/acme/software/anaconda_envs/load_latest_e3sm_unified_x.sh
         ts_ys=1
         ts_ye=50
@@ -39,33 +82,6 @@ if [[ ! $(which ncclimo) ]]; then
     echo "Using e3sm_unified environment..."
     source ${e3sm_config}
 fi
-
-# variables
-case ${varname} in
-    "heatFlux" )
-        varlist="timeMonthly_avg_sensibleHeatFlux,timeMonthly_avg_latentHeatFlux,timeMonthly_avg_shortWaveHeatFlux,timeMonthly_avg_longWaveHeatFluxUp,timeMonthly_avg_longWaveHeatFluxDown"
-        ;;
-    "freshWaterFlux" )
-        varlist="timeMonthly_avg_evaporationFlux,timeMonthly_avg_rainFlux,timeMonthly_avg_snowFlux,timeMonthly_avg_seaIceSalinityFlux,timeMonthly_avg_seaIceFreshWaterFlux,timeMonthly_avg_riverRunoffFlux,timeMonthly_avg_iceRunoffFlux"
-        ;;
-    "windStress" )
-        varlist="timeMonthly_avg_windStressZonal,timeMonthly_avg_windStressMeridional"
-        ;;
-    "mixedLayerDepth" )
-        varlist="timeMonthly_avg_dThreshMLD,timeMonthly_avg_tThreshMLD"
-        ;;
-    "temperature" )
-        varlist="timeMonthly_avg_activeTracers_temperature"
-        ;;
-    "salinity" )
-        varlist="timeMonthly_avg_activeTracers_salinity"
-        ;;
-    "potentialDensity" )
-        varlist="timeMonthly_avg_potentialDensity"
-        ;;
-    "velocity" )
-        varlist="timeMonthly_avg_velocityZonal,timeMonthly_avg_velocityMeridional"
-esac
 
 ys_str=$(printf "%04d" ${ts_ys})
 ye_str=$(printf "%04d" ${ts_ye})
