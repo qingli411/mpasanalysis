@@ -230,7 +230,8 @@ class MPASOMap(object):
             lon_ll, lat_ll, lon_ur, lat_ur = region_obj.lon_ll, region_obj.lat_ll, region_obj.lon_ur, region_obj.lat_ur
             lon_c = 0.5*(lon_ll+lon_ur)
             lat_c = 0.5*(lat_ll+lat_ur)
-            m = Basemap(projection='cass', llcrnrlon=lon_ll, llcrnrlat=lat_ll,
+            # m = Basemap(projection='cass', llcrnrlon=lon_ll, llcrnrlat=lat_ll,
+            m = Basemap(projection='stere', llcrnrlon=lon_ll, llcrnrlat=lat_ll,
                     urcrnrlon=lon_ur, urcrnrlat=lat_ur, resolution='l', lon_0=lon_c, lat_0=lat_c, ax=axis)
             # parallels and meridians
             mdlat = 10.0
@@ -247,9 +248,9 @@ class MPASOMap(object):
         # print message
         print('Plotting map of {} at region \'{}\''.format(self.name+' ('+self.units+')', region))
         # plot coastlines, draw label meridians and parallels.
-        m.drawcoastlines()
+        m.drawcoastlines(zorder=3)
         m.drawmapboundary(fill_color='lightgray')
-        m.fillcontinents(color='gray',lake_color='lightgray')
+        m.fillcontinents(color='gray',lake_color='lightgray', zorder=2)
         m.drawparallels(np.arange(-90.,91.,mdlat), labels=[1,0,0,1])
         m.drawmeridians(np.arange(-180.,181.,mdlon), labels=[1,0,0,1])
         if levels is not None:
@@ -282,13 +283,8 @@ class MPASOMap(object):
             fig = m.scatter(x, y, marker='.', s=markersize, c=data,
                         norm=norm, cmap=plt.cm.get_cmap(cmap), **kwargs)
         elif ptype == 'contourf':
-            # remove nan
-            data_mask = ~np.isnan(data)
-            data = data[data_mask]
-            lon = lon[data_mask]
-            lat = lat[data_mask]
-            # contour plot
-            fig = m.contourf(lon, lat, data, tri=True, latlon=True, levels=levels,
+            x, y = m(lon, lat)
+            fig = m.contourf(x, y, data, tri=True, levels=levels,
                         norm=norm, cmap=plt.cm.get_cmap(cmap), **kwargs)
         else:
             raise ValueError('Plot type {} not supported.'.format(ptype))
@@ -308,6 +304,19 @@ class MPASOMap(object):
             cb.update_ticks()
         return m
 
+    def overlay(self, m, **kwargs):
+        """Overlay contours on a map.
+
+        :m: (Basemap) map
+        :returns: none
+
+        """
+
+        data = self.data
+        lat = self.lat
+        lon = self.lon
+        x, y = m(lon, lat)
+        fig = plt.tricontour(x, y, data, **kwargs)
 
 #--------------------------------
 # MPASOVertCrossSection
@@ -407,6 +416,15 @@ class MPASOVertCrossSection(object):
             cb.formatter.set_powerlimits((-4, 4))
             cb.update_ticks()
         return fig
+
+#--------------------------------
+# MPASCICEMap
+#--------------------------------
+
+class MPASCICEMap(MPASOMap):
+
+    """MPASCICEMap object"""
+    pass
 
 #--------------------------------
 # Region object
