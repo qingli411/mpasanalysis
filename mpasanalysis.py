@@ -453,7 +453,7 @@ def region_latlon(region_name):
         # regional map for Labrador sea
         rg = region(lon_ll=296.0, lat_ll=36.0, lon_ur=356.0, lat_ur=70.0)
     elif region_name == 'LabSea_SD1':
-        rg = region(lon_ll=305.0, lat_ll=55.0, lon_ur=325.0, lat_ur=60.0)
+        rg = region(lon_ll=304.0, lat_ll=56.0, lon_ur=312.0, lat_ur=60.0)
     elif region_name == 'test':
         rg = region(lon_ll=310.0, lat_ll=55.0, lon_ur=320.0, lat_ur=65.0)
     else:
