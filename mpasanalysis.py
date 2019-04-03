@@ -391,7 +391,7 @@ class MPASOVertCrossSection(object):
         if depth_mode == 'native':
             ndepth = self.depth.size
             plt.gcf().canvas.draw()
-            ticks = [item.get_text() for item in axis.get_yticklabels()]
+            ticks = axis.get_yticks()
             idx = [int(item) for item in ticks]
             depth_label = [str(int(round(self.depth[item]))) for item in idx if item < ndepth]
             axis.set_yticklabels(depth_label)
