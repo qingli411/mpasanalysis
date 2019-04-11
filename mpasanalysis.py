@@ -16,7 +16,7 @@ class MPASOVolume(object):
 
     """MPASOVolume object"""
 
-    def __init__(self, data, lon, lat, depth, cellarea, name, units):
+    def __init__(self, data, lon, lat, depth, cellarea, layerthickness, name, units):
         """Iniitalize MPASOVolume
 
         :data: (1D numpy array) data at each location
@@ -24,6 +24,7 @@ class MPASOVolume(object):
         :lat: (1D numpy array) latitude
         :depth: (1D numpy array) depth
         :cellarea: (1D numpy array) area of cells
+        :layerthickness: (1D numpy array) layer thickness
         :name: (str) name of variable
         :units: (str) units of variable
 
@@ -34,6 +35,7 @@ class MPASOVolume(object):
         self.lat = lat
         self.depth = depth
         self.cellarea = cellarea
+        self.layerthickness = layerthickness
         self.name = name
         self.units = units
 
@@ -51,7 +53,47 @@ class MPASOVolume(object):
         obj = MPASOMap(data=self.data[:,zidx], lon=self.lon, lat=self.lat, cellarea=self.cellarea, name=name, units=self.units)
         return obj
 
-    def get_vertical_cross_section(self, lon0, lat0, lon1, lat1, depth_bottom=5000.0, depth_top=0.0):
+    def get_map_vertical_sum(self, depth_bottom=6000.0, depth_top=0.0):
+        """Return a map of vertically integrated field
+        :depth_bottom: (float) depth of the bottom
+        :depth_top: (float) depth of the top
+        :returns: (MPASOMap object) map of vertically integrated field
+
+        """
+        # get z indices
+        zidx0 = np.argmin(np.abs(self.depth-depth_top))
+        zidx1 = np.argmin(np.abs(self.depth-depth_bottom))
+        z_top = self.depth[zidx0]-0.5*self.layerthickness[zidx0]
+        z_bottom = self.depth[zidx1]+0.5*self.layerthickness[zidx1]
+        data = np.nansum(self.data[:,zidx0:zidx1+1] * self.layerthickness[zidx0:zidx1+1].reshape((1,zidx1+1-zidx0)), axis=1)
+        # MPASOMap object
+        name = 'Vertical sum of '+self.name+' between {:6.2f} m and {:6.2f} m'.format(z_top, z_bottom)
+        units = self.units+' m'
+        obj = MPASOMap(data=data, lon=self.lon, lat=self.lat, cellarea=self.cellarea, name=name, units=units)
+        return obj
+
+    def get_map_vertical_mean(self, depth_bottom=6000.0, depth_top=0.0):
+        """Return a map of vertically averaged field
+        :depth_bottom: (float) depth of the bottom
+        :depth_top: (float) depth of the top
+        :returns: (MPASOMap object) map of vertically integrated field
+
+        """
+        # get z indices
+        zidx0 = np.argmin(np.abs(self.depth-depth_top))
+        zidx1 = np.argmin(np.abs(self.depth-depth_bottom))
+        print(zidx0)
+        print(zidx1)
+        z_top = self.depth[zidx0]-0.5*self.layerthickness[zidx0]
+        z_bottom = self.depth[zidx1]+0.5*self.layerthickness[zidx1]
+        data = np.nansum(self.data[:,zidx0:zidx1+1] * self.layerthickness[zidx0:zidx1+1].reshape((1,zidx1+1-zidx0)), axis=1)/(z_bottom-z_top)
+        # MPASOMap object
+        name = 'Vertical mean of '+self.name+' between {:6.2f} m and {:6.2f} m'.format(z_top, z_bottom)
+        units = self.units
+        obj = MPASOMap(data=data, lon=self.lon, lat=self.lat, cellarea=self.cellarea, name=name, units=units)
+        return obj
+
+    def get_vertical_cross_section(self, lon0, lat0, lon1, lat1, depth_bottom=6000.0, depth_top=0.0):
         """Return cross section defined by two points [lon0, lat0] and [lon1, lat1] and
            the depth range [depth_bottom, depth_top]
 
@@ -87,6 +129,7 @@ class MPASOVolume(object):
             dist[i+1] = gc_distance(lon0, lat0, loni[i+1], lati[i+1])
         obj = MPASOVertCrossSection(data=data, lon=loni, lat=lati, dist=dist, depth=depth, name=self.name, units=self.units)
         return obj
+
 
 #--------------------------------
 # MPASOMap
