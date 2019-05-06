@@ -139,7 +139,7 @@ class MPASOMap(object):
 
     """MPASOMap object"""
 
-    def __init__(self, data, lon, lat, cellarea, name, units):
+    def __init__(self, data=None, lon=None, lat=None, cellarea=None, name=None, units=None):
         """Initialize MPASOMap
 
         :data: (1D numpy array) data at each location
@@ -151,12 +151,13 @@ class MPASOMap(object):
 
         """
         self.fillvalue = -9.99999979021476795361e+33
-        self.data = np.where(data<=self.fillvalue, np.nan, data)
         self.lon = lon
         self.lat = lat
         self.cellarea = cellarea
         self.name = name
         self.units = units
+        if data is not None:
+            self.data = np.where(data<=self.fillvalue, np.nan, data)
 
     def save(self, path):
         """Save MPASOMap object
@@ -165,7 +166,8 @@ class MPASOMap(object):
         :returns: none
 
         """
-        np.savez(path, data=self.data, lon=self.lon, lat=self.lat, name=self.name, units=self.units)
+        np.savez(path, data=self.data, lon=self.lon, lat=self.lat, cellarea=self.cellarea,
+                 name=self.name, units=self.units)
 
     def load(self, path):
         """Load data to MPASOMap object
@@ -176,7 +178,7 @@ class MPASOMap(object):
         """
         dat = np.load(path)
         self.__init__(data=dat['data'], lon=dat['lon'], lat=dat['lat'],
-                name=str(dat['name']), units=str(dat['units']))
+                cellarea=dat['cellarea'], name=str(dat['name']), units=str(dat['units']))
         return self
 
     def masked(self, mask, mask_data=np.nan):
