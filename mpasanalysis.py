@@ -336,7 +336,7 @@ class MPASOMap(object):
         if label is not None:
             if region == 'LabSea':
                 axis.text(0.1, 0.67, label, transform=axis.transAxes,
-                    fontsize=14, color='k', fontweight='bold', va='top',
+                    fontsize=12, color='k', fontweight='bold', va='top',
                     bbox=dict(boxstyle='square',ec='k',fc='w'))
         # add title
         if add_title:
@@ -346,21 +346,23 @@ class MPASOMap(object):
             cb = m.colorbar(fig, ax=axis)
             cb.formatter.set_powerlimits((-4, 4))
             cb.update_ticks()
-        return m
+        return m, fig
 
-    def overlay(self, m, **kwargs):
+    def overlay(self, m, axis=None, **kwargs):
         """Overlay contours on a map.
 
         :m: (Basemap) map
         :returns: none
 
         """
-
+        # use curret axis if not specified
+        if axis is None:
+            axis = plt.gca()
         data = self.data
         lat = self.lat
         lon = self.lon
         x, y = m(lon, lat)
-        fig = plt.tricontour(x, y, data, **kwargs)
+        fig = axis.tricontour(x, y, data, **kwargs)
 
 #--------------------------------
 # MPASOVertCrossSection
