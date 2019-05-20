@@ -507,6 +507,81 @@ def region_latlon(region_name):
         raise ValueError('Region {} not supported.'.format(region_name))
     return rg
 
+def select_path(lonP0, latP0, lonP1, latP1,
+                lonVertex, latVertex, lonEdge, latEdge,
+                indexToEdgeID, indexToVertexID,
+                edgesOnVertex, verticesOnEdge,
+                debug_info=False):
+    """ Select the edges and vertices on a path given by the two endpoints.
+    """
+    idxP0 = get_index_latlon([lonP0], [latP0], lonVertex, latVertex)
+    idxP1 = get_index_latlon([lonP1], [latP1], lonVertex, latVertex)
+    print('Vertex closest to P0: {:4.1f} {:4.1f}'.format(lonVertex[idxP0], latVertex[idxP0]))
+    print('Vertex closest to P1: {:4.1f} {:4.1f}'.format(lonVertex[idxP1], latVertex[idxP1]))
+    # initialize arrays
+    edges_on_path        = []
+    idx_edges_on_path    = []
+    vertices_on_path     = []
+    idx_vertices_on_path = []
+    # start from vertex P0
+    idx_vertex_now = idxP0
+    # record vortices on path and the indices
+    vertices_on_path.append(indexToVertexID[idx_vertex_now])
+    idx_vertices_on_path.append(idx_vertex_now)
+    if debug_info:
+        print('Vertex on path: {:4.1f} {:4.1f}'.format(lonVertex[idx_vertex_now], latVertex[idx_vertex_now]))
+
+    # continue if not reached P1
+    while idx_vertex_now != idxP1:
+
+        # find the indices of the three edges on vertex
+        edge_arr     = edgesOnVertex[idx_vertex_now,:]
+        idx_edge_arr = [np.where(indexToEdgeID==val)[0][0] for val in edge_arr]
+        # print the location of the three edges
+        if debug_info:
+            for i in np.arange(len(idx_edge_arr)):
+                print('   Edge {:d}: {:4.1f} {:4.1f}'.\
+                      format(i, lonEdge[idx_edge_arr[i]], latEdge[idx_edge_arr[i]]))
+        # choose the edge from the three that is closest to vertex P1
+        dist = [gc_distance(loni, lati, lonP1, latP1) \
+                for (loni, lati) in zip(lonEdge[idx_edge_arr], latEdge[idx_edge_arr])]
+        idx3_next     = np.argmin(dist)
+        edge_next     = edge_arr[idx3_next]
+        idx_edge_next = np.where(indexToEdgeID==edge_next)[0][0]
+        # print the edge on path
+        if debug_info:
+            print('Edge on path: [Edge {:d}] {:4.1f} {:4.1f}'.\
+                  format(idx3_next, lonEdge[idx_edge_arr[idx3_next]], latEdge[idx_edge_arr[idx3_next]]))
+        # record edges on path and the indices
+        edges_on_path.append(edge_next)
+        idx_edges_on_path.append(idx_edge_next)
+
+        # find the other vertex on this edge
+        vertex_arr      = verticesOnEdge[idx_edge_next,:]
+        vertex_next     = vertex_arr[vertex_arr!=indexToVertexID[idx_vertex_now]][0]
+        idx_vertex_next = np.where(indexToVertexID==vertex_next)[0][0]
+        # record vortices on path and the indices
+        vertices_on_path.append(vertex_next)
+        idx_vertices_on_path.append(idx_vertex_next)
+        if debug_info:
+            print('Vertex on path: {:4.1f} {:4.1f}'.\
+                  format(lonVertex[idx_vertex_next], latVertex[idx_vertex_next]))
+        # move to next vertex
+        idx_vertex_now  = idx_vertex_next
+
+    out = {'edge': edges_on_path,
+           'edge_idx': idx_edges_on_path,
+           'vertex': vertices_on_path,
+           'vertex_idx': idx_vertices_on_path}
+    return out
+
+def get_index_latlon(loni, lati, lon_arr, lat_arr):
+    pts = np.array(list(zip(loni,lati)))
+    tree = spatial.KDTree(list(zip(lon_arr, lat_arr)))
+    p = tree.query(pts)
+    cidx = p[1]
+    return cidx[0]
+
 def gc_radius():
     """Return the radius of Earth
     :returns: (float) radius of Earth in km
