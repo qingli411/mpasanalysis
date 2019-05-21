@@ -16,7 +16,7 @@ class MPASOVolume(object):
 
     """MPASOVolume object"""
 
-    def __init__(self, data, lon, lat, depth, cellarea, name, units):
+    def __init__(self, data, lon, lat, depth, cellarea, layerthickness, name, units):
         """Iniitalize MPASOVolume
 
         :data: (1D numpy array) data at each location
@@ -24,6 +24,7 @@ class MPASOVolume(object):
         :lat: (1D numpy array) latitude
         :depth: (1D numpy array) depth
         :cellarea: (1D numpy array) area of cells
+        :layerthickness: (1D numpy array) layer thickness
         :name: (str) name of variable
         :units: (str) units of variable
 
@@ -34,6 +35,7 @@ class MPASOVolume(object):
         self.lat = lat
         self.depth = depth
         self.cellarea = cellarea
+        self.layerthickness = layerthickness
         self.name = name
         self.units = units
 
@@ -51,7 +53,47 @@ class MPASOVolume(object):
         obj = MPASOMap(data=self.data[:,zidx], lon=self.lon, lat=self.lat, cellarea=self.cellarea, name=name, units=self.units)
         return obj
 
-    def get_vertical_cross_section(self, lon0, lat0, lon1, lat1, depth_bottom=5000.0, depth_top=0.0):
+    def get_map_vertical_sum(self, depth_bottom=6000.0, depth_top=0.0):
+        """Return a map of vertically integrated field
+        :depth_bottom: (float) depth of the bottom
+        :depth_top: (float) depth of the top
+        :returns: (MPASOMap object) map of vertically integrated field
+
+        """
+        # get z indices
+        zidx0 = np.argmin(np.abs(self.depth-depth_top))
+        zidx1 = np.argmin(np.abs(self.depth-depth_bottom))
+        z_top = self.depth[zidx0]-0.5*self.layerthickness[zidx0]
+        z_bottom = self.depth[zidx1]+0.5*self.layerthickness[zidx1]
+        data = np.nansum(self.data[:,zidx0:zidx1+1] * self.layerthickness[zidx0:zidx1+1].reshape((1,zidx1+1-zidx0)), axis=1)
+        # MPASOMap object
+        name = 'Vertical sum of '+self.name+' between {:6.2f} m and {:6.2f} m'.format(z_top, z_bottom)
+        units = self.units+' m'
+        obj = MPASOMap(data=data, lon=self.lon, lat=self.lat, cellarea=self.cellarea, name=name, units=units)
+        return obj
+
+    def get_map_vertical_mean(self, depth_bottom=6000.0, depth_top=0.0):
+        """Return a map of vertically averaged field
+        :depth_bottom: (float) depth of the bottom
+        :depth_top: (float) depth of the top
+        :returns: (MPASOMap object) map of vertically integrated field
+
+        """
+        # get z indices
+        zidx0 = np.argmin(np.abs(self.depth-depth_top))
+        zidx1 = np.argmin(np.abs(self.depth-depth_bottom))
+        print(zidx0)
+        print(zidx1)
+        z_top = self.depth[zidx0]-0.5*self.layerthickness[zidx0]
+        z_bottom = self.depth[zidx1]+0.5*self.layerthickness[zidx1]
+        data = np.nansum(self.data[:,zidx0:zidx1+1] * self.layerthickness[zidx0:zidx1+1].reshape((1,zidx1+1-zidx0)), axis=1)/(z_bottom-z_top)
+        # MPASOMap object
+        name = 'Vertical mean of '+self.name+' between {:6.2f} m and {:6.2f} m'.format(z_top, z_bottom)
+        units = self.units
+        obj = MPASOMap(data=data, lon=self.lon, lat=self.lat, cellarea=self.cellarea, name=name, units=units)
+        return obj
+
+    def get_vertical_cross_section(self, lon0, lat0, lon1, lat1, depth_bottom=6000.0, depth_top=0.0):
         """Return cross section defined by two points [lon0, lat0] and [lon1, lat1] and
            the depth range [depth_bottom, depth_top]
 
@@ -88,6 +130,7 @@ class MPASOVolume(object):
         obj = MPASOVertCrossSection(data=data, lon=loni, lat=lati, dist=dist, depth=depth, name=self.name, units=self.units)
         return obj
 
+
 #--------------------------------
 # MPASOMap
 #--------------------------------
@@ -96,7 +139,7 @@ class MPASOMap(object):
 
     """MPASOMap object"""
 
-    def __init__(self, data, lon, lat, cellarea, name, units):
+    def __init__(self, data=None, lon=None, lat=None, cellarea=None, name=None, units=None):
         """Initialize MPASOMap
 
         :data: (1D numpy array) data at each location
@@ -108,12 +151,13 @@ class MPASOMap(object):
 
         """
         self.fillvalue = -9.99999979021476795361e+33
-        self.data = np.where(data<=self.fillvalue, np.nan, data)
         self.lon = lon
         self.lat = lat
         self.cellarea = cellarea
         self.name = name
         self.units = units
+        if data is not None:
+            self.data = np.where(data<=self.fillvalue, np.nan, data)
 
     def save(self, path):
         """Save MPASOMap object
@@ -122,7 +166,8 @@ class MPASOMap(object):
         :returns: none
 
         """
-        np.savez(path, data=self.data, lon=self.lon, lat=self.lat, name=self.name, units=self.units)
+        np.savez(path, data=self.data, lon=self.lon, lat=self.lat, cellarea=self.cellarea,
+                 name=self.name, units=self.units)
 
     def load(self, path):
         """Load data to MPASOMap object
@@ -133,7 +178,7 @@ class MPASOMap(object):
         """
         dat = np.load(path)
         self.__init__(data=dat['data'], lon=dat['lon'], lat=dat['lat'],
-                name=str(dat['name']), units=str(dat['units']))
+                cellarea=dat['cellarea'], name=str(dat['name']), units=str(dat['units']))
         return self
 
     def masked(self, mask, mask_data=np.nan):
@@ -291,7 +336,7 @@ class MPASOMap(object):
         if label is not None:
             if region == 'LabSea':
                 axis.text(0.1, 0.67, label, transform=axis.transAxes,
-                    fontsize=14, color='k', fontweight='bold', va='top',
+                    fontsize=12, color='k', fontweight='bold', va='top',
                     bbox=dict(boxstyle='square',ec='k',fc='w'))
         # add title
         if add_title:
@@ -301,21 +346,23 @@ class MPASOMap(object):
             cb = m.colorbar(fig, ax=axis)
             cb.formatter.set_powerlimits((-4, 4))
             cb.update_ticks()
-        return m
+        return m, fig
 
-    def overlay(self, m, **kwargs):
+    def overlay(self, m, axis=None, **kwargs):
         """Overlay contours on a map.
 
         :m: (Basemap) map
         :returns: none
 
         """
-
+        # use curret axis if not specified
+        if axis is None:
+            axis = plt.gca()
         data = self.data
         lat = self.lat
         lon = self.lon
         x, y = m(lon, lat)
-        fig = plt.tricontour(x, y, data, **kwargs)
+        fig = axis.tricontour(x, y, data, **kwargs)
 
 #--------------------------------
 # MPASOVertCrossSection
@@ -459,6 +506,81 @@ def region_latlon(region_name):
     else:
         raise ValueError('Region {} not supported.'.format(region_name))
     return rg
+
+def select_path(lonP0, latP0, lonP1, latP1,
+                lonVertex, latVertex, lonEdge, latEdge,
+                indexToEdgeID, indexToVertexID,
+                edgesOnVertex, verticesOnEdge,
+                debug_info=False):
+    """ Select the edges and vertices on a path given by the two endpoints.
+    """
+    idxP0 = get_index_latlon([lonP0], [latP0], lonVertex, latVertex)
+    idxP1 = get_index_latlon([lonP1], [latP1], lonVertex, latVertex)
+    print('Vertex closest to P0: {:4.1f} {:4.1f}'.format(lonVertex[idxP0], latVertex[idxP0]))
+    print('Vertex closest to P1: {:4.1f} {:4.1f}'.format(lonVertex[idxP1], latVertex[idxP1]))
+    # initialize arrays
+    edges_on_path        = []
+    idx_edges_on_path    = []
+    vertices_on_path     = []
+    idx_vertices_on_path = []
+    # start from vertex P0
+    idx_vertex_now = idxP0
+    # record vortices on path and the indices
+    vertices_on_path.append(indexToVertexID[idx_vertex_now])
+    idx_vertices_on_path.append(idx_vertex_now)
+    if debug_info:
+        print('Vertex on path: {:4.1f} {:4.1f}'.format(lonVertex[idx_vertex_now], latVertex[idx_vertex_now]))
+
+    # continue if not reached P1
+    while idx_vertex_now != idxP1:
+
+        # find the indices of the three edges on vertex
+        edge_arr     = edgesOnVertex[idx_vertex_now,:]
+        idx_edge_arr = [np.where(indexToEdgeID==val)[0][0] for val in edge_arr]
+        # print the location of the three edges
+        if debug_info:
+            for i in np.arange(len(idx_edge_arr)):
+                print('   Edge {:d}: {:4.1f} {:4.1f}'.\
+                      format(i, lonEdge[idx_edge_arr[i]], latEdge[idx_edge_arr[i]]))
+        # choose the edge from the three that is closest to vertex P1
+        dist = [gc_distance(loni, lati, lonP1, latP1) \
+                for (loni, lati) in zip(lonEdge[idx_edge_arr], latEdge[idx_edge_arr])]
+        idx3_next     = np.argmin(dist)
+        edge_next     = edge_arr[idx3_next]
+        idx_edge_next = np.where(indexToEdgeID==edge_next)[0][0]
+        # print the edge on path
+        if debug_info:
+            print('Edge on path: [Edge {:d}] {:4.1f} {:4.1f}'.\
+                  format(idx3_next, lonEdge[idx_edge_arr[idx3_next]], latEdge[idx_edge_arr[idx3_next]]))
+        # record edges on path and the indices
+        edges_on_path.append(edge_next)
+        idx_edges_on_path.append(idx_edge_next)
+
+        # find the other vertex on this edge
+        vertex_arr      = verticesOnEdge[idx_edge_next,:]
+        vertex_next     = vertex_arr[vertex_arr!=indexToVertexID[idx_vertex_now]][0]
+        idx_vertex_next = np.where(indexToVertexID==vertex_next)[0][0]
+        # record vortices on path and the indices
+        vertices_on_path.append(vertex_next)
+        idx_vertices_on_path.append(idx_vertex_next)
+        if debug_info:
+            print('Vertex on path: {:4.1f} {:4.1f}'.\
+                  format(lonVertex[idx_vertex_next], latVertex[idx_vertex_next]))
+        # move to next vertex
+        idx_vertex_now  = idx_vertex_next
+
+    out = {'edge': edges_on_path,
+           'edge_idx': idx_edges_on_path,
+           'vertex': vertices_on_path,
+           'vertex_idx': idx_vertices_on_path}
+    return out
+
+def get_index_latlon(loni, lati, lon_arr, lat_arr):
+    pts = np.array(list(zip(loni,lati)))
+    tree = spatial.KDTree(list(zip(lon_arr, lat_arr)))
+    p = tree.query(pts)
+    cidx = p[1]
+    return cidx[0]
 
 def gc_radius():
     """Return the radius of Earth
