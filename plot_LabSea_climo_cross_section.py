@@ -6,18 +6,18 @@
 
 from mpasanalysis import *
 import e3sm_res_cmp
-get_ipython().run_line_magic('matplotlib', 'inline')
+# get_ipython().run_line_magic('matplotlib', 'inline')
 
 
 # In[ ]:
 
 
 # get paths of restart files, monthly mean output files, processed climatology files and output figures
-data_root = e3sm_res_cmp.load_paths_ocn(climo_ys=41, climo_ye=50, ts_ys=1, ts_ye=50)
+data_root = e3sm_res_cmp.load_paths_ocn(climo_ys=10, climo_ye=10, ts_ys=1, ts_ye=25)
 rst_root = data_root['rst_root']
 climo_root = data_root['climo_root']
 fig_root = data_root['fig_root']
-rst_file = rst_root+'/mpaso.rst.0051-01-01_00000.nc'
+rst_file = rst_root+'/mpaso.rst.0026-01-01_00000.nc'
 
 
 # In[ ]:
@@ -99,7 +99,7 @@ for i in np.arange(12):
     mpaso_temp = MPASOVolume(data=temp, lon=lon, lat=lat, depth=refMidDepth, cellarea=cellArea,
                              name='Temperature', units='degC')
     levels = np.linspace(-2, 26, 57)
-    
+
     # Temperature map at different depths
     for depth in depth_list:
         fig = plt.figure(figsize=[6,6])
@@ -111,7 +111,7 @@ for i in np.arange(12):
         figname = fig_root+'/LabSea_climo_{:02d}_Map_temperature_D{:d}.png'.format(i+1, depth)
         fig.savefig(figname, dpi = 300)
         plt.close(fig)
-        
+
     # Vertical cross sections of temeprature
     # section 1
     fig = plt.figure(figsize=[6,4])
@@ -146,7 +146,7 @@ for i in np.arange(12):
     mpaso_salt = MPASOVolume(data=salt, lon=lon, lat=lat, depth=refMidDepth, cellarea=cellArea,
                              name='Salinity', units='psu')
     levels = np.linspace(16, 40, 49)
-    
+
     # Salinity map at different depths
     for depth in depth_list:
         fig = plt.figure(figsize=[6,6])
@@ -158,7 +158,7 @@ for i in np.arange(12):
         figname = fig_root+'/LabSea_climo_{:02d}_Map_salinity_D{:d}.png'.format(i+1, depth)
         fig.savefig(figname, dpi = 300)
         plt.close(fig)
-        
+
     # Vertical cross sections of temeprature
     # section 1
     fig = plt.figure(figsize=[6,4])

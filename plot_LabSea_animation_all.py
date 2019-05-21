@@ -9,10 +9,10 @@ def main():
 
     # get paths of restart files, monthly mean output files, processed climatology files and output figures
     ts_ys = 1
-    ts_ye = 25
-    plt_ys = 41
-    plt_ye = 42
-    nmon = 1 # 12 for production and 1 for testing
+    ts_ye = 20
+    plt_ys = 1
+    plt_ye = 20
+    nmon = 12 # 12 for production and 1 for testing
     data_root = e3sm_res_cmp.load_paths_ocn(climo_ys=ts_ys, climo_ye=ts_ye, ts_ys=ts_ys, ts_ye=ts_ye)
     rst_root = data_root['rst_root']
     mon_root = data_root['mon_root']
@@ -60,7 +60,7 @@ def main():
 
     fig_dir = fig_root+'/Animation/'+varname
     os.makedirs(fig_dir, exist_ok=True)
-    for y in np.arange(plt_ys, plt_ye):
+    for y in np.arange(plt_ys, plt_ye+1):
         for m in np.arange(nmon)+1:
             print('{:04d}-{:02d}'.format(y, m))
             mon_file = mon_root+'/mpaso.hist.am.timeSeriesStatsMonthly.{:04d}-{:02d}-01.nc'.format(y, m)
