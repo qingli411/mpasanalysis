@@ -67,13 +67,23 @@ def load_paths_ocn(climo_ys=41, climo_ye=50, ts_ys=1, ts_ye=50, runname=None):
         else:
             raise ValueError('Run \'{}\' not supported'.format(runname))
     elif 'pn1803144' in hostname:
-        # for testing
-        data_root = os.environ['HOME']+'/data/mpas/test'
-        climo_root = data_root+'/climo'
-        ts_root = data_root+'/ts'
-        fig_root = os.environ['HOME']+'/work/e3sm_res_cmp/figures/test'
-        rst_root = data_root
-        mon_root = data_root
+        if runname is None:
+            # for testing
+            data_root = os.environ['HOME']+'/data/mpas/test'
+            climo_root = data_root+'/climo'
+            ts_root = data_root+'/ts'
+            fig_root = os.environ['HOME']+'/work/e3sm_res_cmp/figures/test'
+            rst_root = data_root
+            mon_root = data_root
+        elif runname == 'gl-mesh':
+            data_root = os.environ['HOME']+'/data/mpas/test/gl-mesh'
+            climo_root = data_root+'/climo'
+            ts_root = data_root+'/ts'
+            fig_root = os.environ['HOME']+'/work/e3sm_res_cmp/figures/test/gl-mesh'
+            rst_root = data_root
+            mon_root = data_root
+        else:
+            raise ValueError('Run \'{}\' not supported'.format(runname))
     else:
         raise EnvironmentError('This script should be executed on edison, theta, blues or pn1803144')
     os.makedirs(fig_root, exist_ok=True)
@@ -147,13 +157,23 @@ def load_paths_ice(climo_ys=41, climo_ye=50, ts_ys=1, ts_ye=50, runname=None):
         else:
             raise ValueError('Run \'{}\' not supported'.format(runname))
     elif 'pn1803144' in hostname:
-        # for testing
-        data_root = os.environ['HOME']+'/data/mpas/test'
-        climo_root = data_root+'/climo'
-        ts_root = data_root+'/ts'
-        fig_root = os.environ['HOME']+'/work/e3sm_res_cmp/figures/test'
-        rst_root = data_root
-        mon_root = data_root
+        if runname is None:
+            # for testing
+            data_root = os.environ['HOME']+'/data/mpas/test'
+            climo_root = data_root+'/climo'
+            ts_root = data_root+'/ts'
+            fig_root = os.environ['HOME']+'/work/e3sm_res_cmp/figures/test'
+            rst_root = data_root
+            mon_root = data_root
+        elif runname == 'gl-mesh':
+            data_root = os.environ['HOME']+'/data/mpas/test/gl-mesh'
+            climo_root = data_root+'/climo'
+            ts_root = data_root+'/ts'
+            fig_root = os.environ['HOME']+'/work/e3sm_res_cmp/figures/test/gl-mesh'
+            rst_root = data_root
+            mon_root = data_root
+        else:
+            raise ValueError('Run \'{}\' not supported'.format(runname))
     else:
         raise EnvironmentError('This script should be executed on edison, theta, blues or pn1803144')
     os.makedirs(fig_root, exist_ok=True)
