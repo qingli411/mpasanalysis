@@ -16,7 +16,7 @@ class MPASOVolume(object):
 
     """MPASOVolume object"""
 
-    def __init__(self, data, lon, lat, depth, cellarea, layerthickness, name, units):
+    def __init__(self, data, lon, lat, depth, cellarea, layerthickness, bottomdepth, name, units):
         """Iniitalize MPASOVolume
 
         :data: (1D numpy array) data at each location
@@ -25,6 +25,7 @@ class MPASOVolume(object):
         :depth: (1D numpy array) depth
         :cellarea: (1D numpy array) area of cells
         :layerthickness: (1D numpy array) layer thickness
+        :bottomdepth: (1D numpy array) depth of bottom
         :name: (str) name of variable
         :units: (str) units of variable
 
@@ -36,6 +37,7 @@ class MPASOVolume(object):
         self.depth = depth
         self.cellarea = cellarea
         self.layerthickness = layerthickness
+        self.bottomdepth = bottomdepth
         self.name = name
         self.units = units
 
@@ -123,13 +125,28 @@ class MPASOVolume(object):
         zidx1 = np.argmin(np.abs(self.depth-depth_bottom))
         data = self.data[cidx,zidx0:zidx1]
         depth = self.depth[zidx0:zidx1]
+        bottomdepth = self.bottomdepth[cidx]
         # calculate distance from [lon0, lat0]
         dist = np.zeros(npoints)
         for i in np.arange(npoints-1):
             dist[i+1] = gc_distance(lon0, lat0, loni[i+1], lati[i+1])
-        obj = MPASOVertCrossSection(data=data, lon=loni, lat=lati, dist=dist, depth=depth, name=self.name, units=self.units)
+        obj = MPASOVertCrossSection(data=data, lon=loni, lat=lati, dist=dist, depth=depth, bottomdepth=bottomdepth, name=self.name, units=self.units)
         return obj
 
+    def get_transect(self, transect):
+        """Return the transect defined by the VerticalTransect object.
+
+        :transect: (VerticalTransect object) vertical transect
+        :returns: (MPASOVertCrossSection object) vertical cross section
+
+        """
+        obj = self.get_vertical_cross_section(lon0=transect.lon0,
+                                              lat0=transect.lat0,
+                                              lon1=transect.lon1,
+                                              lat1=transect.lat1,
+                                              depth_bottom=transect.depth,
+                                              depth_top=0.0)
+        return obj
 
 #--------------------------------
 # MPASOMap
@@ -372,7 +389,7 @@ class MPASOVertCrossSection(object):
 
     """MPASOVertCrossSection object"""
 
-    def __init__(self, data, lon, lat, dist, depth, name, units):
+    def __init__(self, data, lon, lat, dist, depth, name, units, bottomdepth=None):
         """Initialize MPASOCrossSection
 
         :data: (1D numpy array) data array
@@ -380,15 +397,21 @@ class MPASOVertCrossSection(object):
         :lat: (1D numpy array) latitude array
         :dist: (1D numpy array) distance array
         :depth: (1D numpy array) depth array
+        :bottomdepth: (1D numpy array) depth of bottom
         :name: (str) name of variable
         :units: (str) units of variable
 
         """
+        if bottomdepth is not None:
+            for i in np.arange(bottomdepth.size):
+                idxd = depth>bottomdepth[i]
+                data[i,idxd] = np.nan
         self.data = data
         self.lon = lon
         self.lat = lat
         self.dist = dist
         self.depth = depth
+        self.bottomdepth = bottomdepth
         self.name = name
         self.units = units
 
@@ -473,6 +496,40 @@ class MPASCICEMap(MPASOMap):
     pass
 
 #--------------------------------
+# Vertical transsect object
+#--------------------------------
+class VerticalTransect(object):
+    """Vertical transect along the great circle defined by two endpoints"""
+    def __init__(self, name=None, lon0=None, lat0=None, lon1=None, lat1=None, depth=None):
+        self.name = name
+        self.lon0 = lon0
+        self.lat0 = lat0
+        self.lon1 = lon1
+        self.lat1 = lat1
+        self.depth = depth
+
+    def interpolate(self, npoints):
+        """Interpolate along great circle."""
+        lon_arr, lat_arr = gc_interpolate(self.lon0, self.lat0, self.lon1, self.lat1, npoints)
+        return lon_arr, lat_arr
+
+    def direction(self, npoints):
+        """Direction of great circle (P0->P1) defined by the angle (in radius) counterclockwise from East """
+        lon, lat = self.interpolate(npoints)
+        lat0 = np.zeros(npoints)
+        lon0 = np.zeros(npoints)
+        lat1 = np.zeros(npoints)
+        lon1 = np.zeros(npoints)
+        lat0[1:-1] = lat[0:-2]
+        lat1[1:-1] = lat[2:]
+        lon0[1:-1] = lon[0:-2]
+        lon1[1:-1] = lon[2:]
+        dir_arr = gc_angle(lon0, lat0, lon1, lat1)
+        dir_arr[0] = dir_arr[1]
+        dir_arr[-1] = dir_arr[-2]
+        return dir_arr
+
+#--------------------------------
 # Region object
 #--------------------------------
 
@@ -487,6 +544,45 @@ class region(object):
 #--------------------------------
 # Functions
 #--------------------------------
+
+def transect(name):
+    """Return VerticalTransect object given the name
+
+    :name: (str) transect name
+    :return: (VerticalTransect object) transect
+
+    """
+    if name == 'AR7W':
+        out = VerticalTransect(name=name,
+                               lon0=304,
+                               lat0=53.5,
+                               lon1=312,
+                               lat1=61,
+                               depth=4500.0)
+    elif name == 'Davis Strait':
+        out = VerticalTransect(name=name,
+                               lon0=298.5,
+                               lat0=66.5,
+                               lon1=306,
+                               lat1=67,
+                               depth=1500.0)
+    elif name == 'Hudson Strait':
+        out = VerticalTransect(name=name,
+                               lon0=295.2,
+                               lat0=60.4,
+                               lon1=293.7,
+                               lat1=61.9,
+                               depth=1000.0)
+    elif name == 'LabSea Center':
+        out = VerticalTransect(name=name,
+                               lon0=296,
+                               lat0=63,
+                               lon1=320,
+                               lat1=50,
+                               depth=4500.0)
+    else:
+        raise ValueError('Transect \'{}\' not found.'.format(name) )
+    return out
 
 def region_latlon(region_name):
     """Return longitude and latitude of lower left an upper right of the region.
@@ -589,6 +685,38 @@ def gc_radius():
     """
     return 6371.0
 
+def gc_angle(lon0, lat0, lon1, lat1):
+    """Calculate the angle counterclockwise from east.
+    :lon0: (float) longitude of point 1 in degrees
+    :lat0: (float) latitude of point 1 in degrees
+    :lon1: (float) longitude of point 2 in degrees
+    :lat1: (float) latitude of point 2 in degrees
+    :returns: (float) angle in degrees
+    """
+    dlon_r = np.radians(lon1-lon0)
+    dlat_r = np.radians(lat1-lat0)
+    angle = np.arctan2(dlat_r, dlon_r)
+    return angle
+
+def gc_angles(lon, lat):
+    """A wrapper of gc_angle to compute the angle counterclockwise from east for an array of lon and lat
+    :lon: (numpy array) array of longitudes
+    :lat: (numpy array) array of latitudes
+
+    """
+    lat0 = np.zeros(lat.size)
+    lon0 = np.zeros(lon.size)
+    lat1 = np.zeros(lat.size)
+    lon1 = np.zeros(lon.size)
+    lat0[1:-1] = lat[0:-2]
+    lat1[1:-1] = lat[2:]
+    lon0[1:-1] = lon[0:-2]
+    lon1[1:-1] = lon[2:]
+    angles = gc_angle(lon0, lat0, lon1, lat1)
+    angles[0] = angles[1]
+    angles[-1] = angles[-2]
+    return angles
+
 def gc_distance(lon0, lat0, lon1, lat1):
     """Calculate the great circle distance (km) between two points [lon0, lat0] and [lon1, lat1]
     http://www.movable-type.co.uk/scripts/latlong.html
@@ -639,6 +767,26 @@ def gc_interpolate(lon0, lat0, lon1, lat1, npoints):
     lat_out = np.arctan2(z, np.sqrt(x**2 + y**2))
     lon_out = np.arctan2(y, x)
     return np.degrees(lon_out), np.degrees(lat_out)
+
+def plot_transect_normal(mpaso_data_x, mpaso_data_y, transect, name='Normal Component', **kwargs):
+    # cross section of zonal and meridional component
+    mpaso_vcsec_x = mpaso_data_x.get_transect(transect)
+    mpaso_vcsec_y = mpaso_data_y.get_transect(transect)
+    # show locations of data point along cross section
+    lon_cs = mpaso_vcsec_x.lon
+    lat_cs = mpaso_vcsec_x.lat
+    # transect of normal component
+    angles_cs = gc_angles(lon_cs, lat_cs)
+    depth_cs = mpaso_vcsec_x.depth
+    nd = depth_cs.size
+    data_cs = np.zeros(mpaso_vcsec_x.data.shape)
+    for i in np.arange(nd):
+        data_cs[:,i] = -mpaso_vcsec_x.data[:,i]*np.sin(angles_cs)+mpaso_vcsec_y.data[:,i]*np.cos(angles_cs)
+    mpaso_vcsec = MPASOVertCrossSection(data=data_cs, lon=lon_cs, lat=lat_cs, dist=mpaso_vcsec_x.dist,
+                                         depth=mpaso_vcsec_x.depth, name=name,
+                                         units=mpaso_vcsec_x.units)
+    fig = mpaso_vcsec.plot(**kwargs)
+    return fig
 
 def plot_map(xx, yy, data, axis=None, levels=None, add_colorbar=True, draw_eq=False, cmap='rainbow', **kwargs):
     # use curret axis if not specified

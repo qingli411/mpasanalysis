@@ -1,9 +1,11 @@
+#!/usr/bin/env python
+
 from mpasanalysis import *
 import e3sm_res_cmp
 
 def main():
     global fig_dir
-    global lon, lat, refMidDepth, cellArea
+    global lon, lat, refMidDepth, cellArea, refLayerThickness, bottomDepth
     global s1_s_lon, s1_s_lat, s1_e_lon, s1_e_lat
     global s2_s_lon, s2_s_lat, s2_e_lon, s2_e_lat
 
@@ -28,6 +30,7 @@ def main():
     lon = np.degrees(f_rst.variables['lonCell'][:])
     lat = np.degrees(f_rst.variables['latCell'][:])
     cellArea = f_rst.variables['areaCell'][:]
+    bottomDepth = f_rst.variables['bottomDepth'][:]
 
     refBottomDepth = f_rst.variables['refBottomDepth'][:]
     nVertLevels = len(refBottomDepth)
@@ -72,6 +75,7 @@ def main():
             f_mon1.close()
 
     # ### Temperature (degC) with ice thickness (m)
+
     varname = 'timeMonthly_avg_activeTracers_temperature'
     units = 'degC'
     levels = np.linspace(-2, 26, 57)
@@ -115,18 +119,21 @@ def plot_labsea_ocn_ice(f_ocn, f_ice, vname_ocn, vname_ice, units_ocn, units_ice
 
     # read monthly mean ocean data
     data_ocn = f_ocn.variables[vname_ocn][0,:,:]
-    mpasovol_obj = MPASOVolume(data=data_ocn, lat=lat, lon=lon, depth=refMidDepth, cellarea=cellArea, name=vname_ocn, units=units_ocn)
+    mpasovol_obj = MPASOVolume(data=data_ocn, lat=lat, lon=lon, depth=refMidDepth, cellarea=cellArea,
+                               layerthickness=refLayerThickness, bottomdepth=bottomDepth,
+                               name=vname_ocn, units=units_ocn)
     mpaso_obj = mpasovol_obj.get_map(depth=0.0)
     # read monthly mean sea ice data
     data_ice = f_ice.variables[vname_ice][0,:]
-    mpascice_obj = MPASCICEMap(data=data_ice, lat=lat, lon=lon, cellarea=cellArea, name=vname_ice, units=units_ice)
+    mpascice_obj = MPASCICEMap(data=data_ice, lat=lat, lon=lon, cellarea=cellArea,
+                               name=vname_ice, units=units_ice)
     # year and month
     yyyy = '{:04d}'.format(iyear)
     mm = '{:02d}'.format(imon)
 
     # plot figure 1: map
     fig = plt.figure(figsize=[6, 5.5])
-    m = mpaso_obj.plot(region='LabSea', levels=levels_ocn, ptype='contourf')
+    m,tmp = mpaso_obj.plot(region='LabSea', levels=levels_ocn, ptype='contourf')
     mpascice_obj.overlay(m, levels=levels_ice, cmap='bone_r')
     m.drawgreatcircle(s1_s_lon, s1_s_lat, s1_e_lon, s1_e_lat, color='gray')
     m.drawgreatcircle(s2_s_lon, s2_s_lat, s2_e_lon, s2_e_lat, color='gray')
@@ -142,12 +149,11 @@ def plot_labsea_ocn_ice(f_ocn, f_ice, vname_ocn, vname_ice, units_ocn, units_ice
     fig = plt.figure(figsize=[6, 4])
     mpaso_vcsec1 = mpasovol_obj.get_vertical_cross_section(lon0=s1_s_lon, lat0=s1_s_lat,
                                                            lon1=s1_e_lon, lat1=s1_e_lat)
-    mpaso_vcsec1.plot(levels=levels_ocn, depth_mode='native', add_title=False)
+    mpaso_vcsec1.plot(levels=levels_ocn, depth_mode='native')
     axis = plt.gca()
     axis.text(0.06, 0.12, yyyy+'-'+mm, transform=axis.transAxes,
                  fontsize=12, color='k', va='top',
                  bbox=dict(boxstyle='square',ec='k',fc='w'))
-    plt.tight_layout()
     figname = fig_dir+'/LabSea_climo_VCSec1_'+yyyy+'-'+mm+'.png'
     fig.savefig(figname, dpi = 300)
     plt.close(fig)
@@ -156,15 +162,15 @@ def plot_labsea_ocn_ice(f_ocn, f_ice, vname_ocn, vname_ice, units_ocn, units_ice
     fig = plt.figure(figsize=[6, 4])
     mpaso_vcsec2 = mpasovol_obj.get_vertical_cross_section(lon0=s2_s_lon, lat0=s2_s_lat,
                                                          lon1=s2_e_lon, lat1=s2_e_lat, depth_bottom=4500)
-    mpaso_vcsec2.plot(levels=levels_ocn, depth_mode='native', add_title=False)
+    mpaso_vcsec2.plot(levels=levels_ocn, depth_mode='native')
     axis = plt.gca()
     axis.text(0.06, 0.12, yyyy+'-'+mm, transform=axis.transAxes,
                  fontsize=12, color='k', va='top',
                  bbox=dict(boxstyle='square',ec='k',fc='w'))
-    plt.tight_layout()
     figname = fig_dir+'/LabSea_climo_VCSec2_'+yyyy+'-'+mm+'.png'
     fig.savefig(figname, dpi = 300)
     plt.close(fig)
 
 if __name__ == "__main__":
     main()
+
