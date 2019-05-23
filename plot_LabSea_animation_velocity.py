@@ -10,16 +10,17 @@ def main():
 
     # get paths of restart files, monthly mean output files, processed climatology files and output figures
     ts_ys = 1
-    ts_ye = 25
-    plt_ys = 41
-    plt_ye = 41
+    ts_ye = 20
+    plt_ys = 1
+    plt_ye = 20
     nmon = 12 # 12 for production and 1 for testing
-    data_root = e3sm_res_cmp.load_paths_ocn(climo_ys=ts_ys, climo_ye=ts_ye, ts_ys=ts_ys, ts_ye=ts_ye)
+    runname = 'gl-mesh'
+    data_root = e3sm_res_cmp.load_paths_ocn(climo_ys=ts_ys, climo_ye=ts_ye, ts_ys=ts_ys, ts_ye=ts_ye, runname=runname)
     rst_root = data_root['rst_root']
     mon_root = data_root['mon_root']
     fig_root = data_root['fig_root']
     rst_file = rst_root+'/mpaso.rst.{:04d}-01-01_00000.nc'.format(ts_ye+1)
-    data_root_ice = e3sm_res_cmp.load_paths_ice(climo_ys=ts_ys, climo_ye=ts_ye, ts_ys=ts_ys, ts_ye=ts_ye)
+    data_root_ice = e3sm_res_cmp.load_paths_ice(climo_ys=ts_ys, climo_ye=ts_ye, ts_ys=ts_ys, ts_ye=ts_ye, runname=runname)
     mon_root_ice = data_root_ice['mon_root']
 
     # load dataset
@@ -50,8 +51,8 @@ def main():
 
     fig_dir = fig_root+'/Animation/'+varname
     os.makedirs(fig_dir, exist_ok=True)
-    for y in np.arange(plt_ye-plt_ys+1):
-        for m in np.arange(nmon):
+    for y in np.arange(plt_ye-plt_ys)+1:
+        for m in np.arange(nmon)+1:
             print('{:04d}-{:02d}'.format(y, m))
             mon_file = mon_root+'/mpaso.hist.am.timeSeriesStatsMonthly.{:04d}-{:02d}-01.nc'.format(y, m)
             print(mon_file)
