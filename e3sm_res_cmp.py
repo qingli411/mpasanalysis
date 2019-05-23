@@ -57,6 +57,13 @@ def load_paths_ocn(climo_ys=41, climo_ye=50, ts_ys=1, ts_ye=50, runname=None):
             fig_root = os.environ['HOME']+'/work/e3sm_res_cmp/figures/gl-mesh/{:04d}-{:04d}'.format(climo_ys+yshift, climo_ye+yshift)
             rst_root = data_root+'/run'
             mon_root = data_root+'/run'
+        elif runname == 'low-res-gm6h':
+            data_root = '/lcrc/group/acme/jwolfe/acme_scratch/anvil/20190326.GM600.A_WCYCL1850S.ne30_oECv3.anvil'
+            climo_root = '/lcrc/group/acme/qingli/e3sm_climo//20190326.GM600.A_WCYCL1850S.ne30_oECv3.anvil/{:04d}-{:04d}/ocn'.format(climo_ys+yshift, climo_ye+yshift)
+            ts_root = '/lcrc/group/acme/qingli/e3sm_ts/20190326.GM600.A_WCYCL1850S.ne30_oECv3.anvil/{:04d}-{:04d}/ocn'.format(ts_ys+yshift, ts_ye+yshift)
+            fig_root = os.environ['HOME']+'/work/e3sm_res_cmp/figures/low-res-gm6h/{:04d}-{:04d}'.format(climo_ys+yshift, climo_ye+yshift)
+            rst_root = data_root+'/run'
+            mon_root = data_root+'/run'
         else:
             raise ValueError('Run \'{}\' not supported'.format(runname))
     elif 'pn1803144' in hostname:
@@ -128,6 +135,13 @@ def load_paths_ice(climo_ys=41, climo_ye=50, ts_ys=1, ts_ye=50, runname=None):
             climo_root = '/lcrc/group/acme/qingli/e3sm_climo/20190419.test.A_WCYCL1850.ne30_oGNLD30to10.anvil/{:04d}-{:04d}/ice'.format(climo_ys+yshift, climo_ye+yshift)
             ts_root = '/lcrc/group/acme/qingli/e3sm_ts/20190419.test.A_WCYCL1850.ne30_oGNLD30to10.anvil/{:04d}-{:04d}/ice'.format(ts_ys+yshift, ts_ye+yshift)
             fig_root = os.environ['HOME']+'/work/e3sm_res_cmp/figures/gl-mesh/{:04d}-{:04d}'.format(climo_ys+yshift, climo_ye+yshift)
+            rst_root = data_root+'/run'
+            mon_root = data_root+'/run'
+        elif runname == 'low-res-gm6h':
+            data_root = '/lcrc/group/acme/jwolfe/acme_scratch/anvil/20190326.GM600.A_WCYCL1850S.ne30_oECv3.anvil'
+            climo_root = '/lcrc/group/acme/qingli/e3sm_climo//20190326.GM600.A_WCYCL1850S.ne30_oECv3.anvil/{:04d}-{:04d}/ice'.format(climo_ys+yshift, climo_ye+yshift)
+            ts_root = '/lcrc/group/acme/qingli/e3sm_ts/20190326.GM600.A_WCYCL1850S.ne30_oECv3.anvil/{:04d}-{:04d}/ice'.format(ts_ys+yshift, ts_ye+yshift)
+            fig_root = os.environ['HOME']+'/work/e3sm_res_cmp/figures/low-res-gm6h/{:04d}-{:04d}'.format(climo_ys+yshift, climo_ye+yshift)
             rst_root = data_root+'/run'
             mon_root = data_root+'/run'
         else:

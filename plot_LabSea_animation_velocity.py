@@ -10,11 +10,11 @@ def main():
 
     # get paths of restart files, monthly mean output files, processed climatology files and output figures
     ts_ys = 1
-    ts_ye = 20
+    ts_ye = 24
     plt_ys = 1
-    plt_ye = 20
+    plt_ye = 24
     nmon = 12 # 12 for production and 1 for testing
-    runname = 'gl-mesh'
+    runname = 'low-res-gm6h'
     data_root = e3sm_res_cmp.load_paths_ocn(climo_ys=ts_ys, climo_ye=ts_ye, ts_ys=ts_ys, ts_ye=ts_ye, runname=runname)
     rst_root = data_root['rst_root']
     mon_root = data_root['mon_root']
@@ -47,11 +47,11 @@ def main():
     varname_y = 'timeMonthly_avg_velocityMeridional'
     varname = 'timeMonthly_avg_velocity'
     units = 'm/s'
-    levels = np.linspace(-0.3, 0.3, 21)
+    levels = np.linspace(-0.5, 0.5, 51)
 
     fig_dir = fig_root+'/Animation/'+varname
     os.makedirs(fig_dir, exist_ok=True)
-    for y in np.arange(plt_ye-plt_ys)+1:
+    for y in np.arange(plt_ye-plt_ys+1)+1:
         for m in np.arange(nmon)+1:
             print('{:04d}-{:02d}'.format(y, m))
             mon_file = mon_root+'/mpaso.hist.am.timeSeriesStatsMonthly.{:04d}-{:02d}-01.nc'.format(y, m)
@@ -98,7 +98,7 @@ def plot_LabSea_velocity(f_in, vname_x, vname_y, vname, units, levels, iyear, im
 
     # plot figure 1: map
     fig = plt.figure(figsize=[6, 5.5])
-    levels1 = np.linspace(0, levels[-1], 31)
+    levels1 = np.linspace(0, levels[-1], 51)
     m,tmp = mpaso_obj.plot(region='LabSea', levels=levels1, ptype='contourf')
     m.drawgreatcircle(trnsct.lon0, trnsct.lat0, trnsct.lon1, trnsct.lat1, color='gray')
     axis = plt.gca()
