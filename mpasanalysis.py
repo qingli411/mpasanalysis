@@ -16,7 +16,7 @@ class MPASOVolume(object):
 
     """MPASOVolume object"""
 
-    def __init__(self, data, lon, lat, depth, cellarea, layerthickness, name, units):
+    def __init__(self, data, lon, lat, depth, cellarea, layerthickness, bottomdepth, name, units):
         """Iniitalize MPASOVolume
 
         :data: (1D numpy array) data at each location
@@ -25,6 +25,7 @@ class MPASOVolume(object):
         :depth: (1D numpy array) depth
         :cellarea: (1D numpy array) area of cells
         :layerthickness: (1D numpy array) layer thickness
+        :bottomdepth: (1D numpy array) depth of bottom
         :name: (str) name of variable
         :units: (str) units of variable
 
@@ -36,6 +37,7 @@ class MPASOVolume(object):
         self.depth = depth
         self.cellarea = cellarea
         self.layerthickness = layerthickness
+        self.bottomdepth = bottomdepth
         self.name = name
         self.units = units
 
@@ -123,11 +125,12 @@ class MPASOVolume(object):
         zidx1 = np.argmin(np.abs(self.depth-depth_bottom))
         data = self.data[cidx,zidx0:zidx1]
         depth = self.depth[zidx0:zidx1]
+        bottomdepth = self.bottomdepth[cidx]
         # calculate distance from [lon0, lat0]
         dist = np.zeros(npoints)
         for i in np.arange(npoints-1):
             dist[i+1] = gc_distance(lon0, lat0, loni[i+1], lati[i+1])
-        obj = MPASOVertCrossSection(data=data, lon=loni, lat=lati, dist=dist, depth=depth, name=self.name, units=self.units)
+        obj = MPASOVertCrossSection(data=data, lon=loni, lat=lati, dist=dist, depth=depth, bottomdepth=bottomdepth, name=self.name, units=self.units)
         return obj
 
     def get_transect(self, transect):
@@ -386,7 +389,7 @@ class MPASOVertCrossSection(object):
 
     """MPASOVertCrossSection object"""
 
-    def __init__(self, data, lon, lat, dist, depth, name, units):
+    def __init__(self, data, lon, lat, dist, depth, name, units, bottomdepth=None):
         """Initialize MPASOCrossSection
 
         :data: (1D numpy array) data array
@@ -394,15 +397,21 @@ class MPASOVertCrossSection(object):
         :lat: (1D numpy array) latitude array
         :dist: (1D numpy array) distance array
         :depth: (1D numpy array) depth array
+        :bottomdepth: (1D numpy array) depth of bottom
         :name: (str) name of variable
         :units: (str) units of variable
 
         """
+        if bottomdepth is not None:
+            for i in np.arange(bottomdepth.size):
+                idxd = depth>bottomdepth[i]
+                data[i,idxd] = np.nan
         self.data = data
         self.lon = lon
         self.lat = lat
         self.dist = dist
         self.depth = depth
+        self.bottomdepth = bottomdepth
         self.name = name
         self.units = units
 
@@ -535,6 +544,45 @@ class region(object):
 #--------------------------------
 # Functions
 #--------------------------------
+
+def transect(name):
+    """Return VerticalTransect object given the name
+
+    :name: (str) transect name
+    :return: (VerticalTransect object) transect
+
+    """
+    if name == 'AR7W':
+        out = VerticalTransect(name=name,
+                               lon0=304,
+                               lat0=53.5,
+                               lon1=312,
+                               lat1=61,
+                               depth=4500.0)
+    elif name == 'Davis Strait':
+        out = VerticalTransect(name=name,
+                               lon0=298.5,
+                               lat0=66.5,
+                               lon1=306,
+                               lat1=67,
+                               depth=1500.0)
+    elif name == 'Hudson Strait':
+        out = VerticalTransect(name=name,
+                               lon0=295.2,
+                               lat0=60.4,
+                               lon1=293.7,
+                               lat1=61.9,
+                               depth=1000.0)
+    elif name == 'LabSea Center':
+        out = VerticalTransect(name=name,
+                               lon0=296,
+                               lat0=63,
+                               lon1=320,
+                               lat1=50,
+                               depth=4500.0)
+    else:
+        raise ValueError('Transect \'{}\' not found.'.format(name) )
+    return out
 
 def region_latlon(region_name):
     """Return longitude and latitude of lower left an upper right of the region.
@@ -720,7 +768,7 @@ def gc_interpolate(lon0, lat0, lon1, lat1, npoints):
     lon_out = np.arctan2(y, x)
     return np.degrees(lon_out), np.degrees(lat_out)
 
-def plot_transect_vector(mpaso_data_x, mpaso_data_y, transect, **kwargs):
+def plot_transect_normal(mpaso_data_x, mpaso_data_y, transect, name='Normal Component', **kwargs):
     # cross section of zonal and meridional component
     mpaso_vcsec_x = mpaso_data_x.get_transect(transect)
     mpaso_vcsec_y = mpaso_data_y.get_transect(transect)
@@ -735,7 +783,7 @@ def plot_transect_vector(mpaso_data_x, mpaso_data_y, transect, **kwargs):
     for i in np.arange(nd):
         data_cs[:,i] = -mpaso_vcsec_x.data[:,i]*np.sin(angles_cs)+mpaso_vcsec_y.data[:,i]*np.cos(angles_cs)
     mpaso_vcsec = MPASOVertCrossSection(data=data_cs, lon=lon_cs, lat=lat_cs, dist=mpaso_vcsec_x.dist,
-                                         depth=mpaso_vcsec_x.depth, name='Normal Component',
+                                         depth=mpaso_vcsec_x.depth, name=name,
                                          units=mpaso_vcsec_x.units)
     fig = mpaso_vcsec.plot(**kwargs)
     return fig
