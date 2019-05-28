@@ -62,9 +62,12 @@ case "${HOSTNAME}" in
         drc_in=/global/cscratch1/sd/tang30/ACME_simulations/edison.20181204.noCNT.A_WCYCL1950S_CMIP6_LRtunedHR.ne30_oECv3_ICG/archive/${component}/hist
         e3sm_config=/global/project/projectdirs/acme/software/anaconda_envs/load_latest_e3sm_unified_x.sh
         ;;
-    blogin* )
-        caseid=20190212.A_WCYCL1950S_CMIP6_LRtunedHR-noCNT.ne30_oECv3_ICG.anvil
-        drc_in=/lcrc/group/acme/jwolfe/acme_scratch/anvil/20190212.A_WCYCL1950S_CMIP6_LRtunedHR-noCNT.ne30_oECv3_ICG.anvil/run
+    blueslogin* )
+        # caseid=20190212.A_WCYCL1950S_CMIP6_LRtunedHR-noCNT.ne30_oECv3_ICG.anvil
+        # caseid=20190419.test.A_WCYCL1850.ne30_oGNLD30to10.anvil
+        # drc_in=/lcrc/group/acme/jwolfe/acme_scratch/anvil/${caseid}/run
+        caseid=20190509.A_WCYCL1950S_CMIP6_LRtunedHR.ne30_oECv3_ICG.anvil
+        drc_in=/lcrc/group/acme/jwolfe/acme_scratch/${caseid}/run
         drc_out=/lcrc/group/acme/qingli/e3sm_climo
         e3sm_config=/lcrc/soft/climate/e3sm-unified/load_latest_e3sm_unified_x.sh
         ;;
