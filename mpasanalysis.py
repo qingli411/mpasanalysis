@@ -29,7 +29,7 @@ class MPASMesh(object):
         out = Dataset(self.filepath, 'r')
         return out
 
-    def get_shortest_path(self, lonP0, latP0, lonP1, latP1, npoint_ref=9, weight_ref=1.0, debug_info=False):
+    def get_shortest_path(self, lonP0, latP0, lonP1, latP1, npoint_ref=1, debug_info=False):
         """ Get the shorted path that connects two endpoints.
 
         :lonP0: (float) Longitude of endpoint 0
@@ -57,7 +57,35 @@ class MPASMesh(object):
         print('Vertex closest to P1: {:8.5f} {:8.5f}'.format(lonVertex[idxP1], latVertex[idxP1]))
         # find reference points
         lon_ref, lat_ref = gc_interpolate(lonVertex[idxP0], latVertex[idxP0], \
-                                          lonVertex[idxP1], latVertex[idxP1], npoint_ref)
+                                          lonVertex[idxP1], latVertex[idxP1], npoint_ref+2)
+        lon_ref = np.mod(lon_ref[1:-1], 360)
+        lat_ref = np.mod(lat_ref[1:-1], 360)
+        # initialize path
+        out = self.Path(mesh=self,
+                        idx_edge=[],
+                        idx_vertex=[],
+                        sign_edges=[],
+                        lon_edge=[],
+                        lat_edge=[],
+                        lon_vertex=[],
+                        lat_vertex=[])
+        # loop over reference points, find the path between these points
+        idx_sp0 = idxP0
+        for i in np.arange(npoint_ref):
+            idx_vertex = np.minimum(i,1)
+            idx_sp1 = get_index_latlon(lon_ref[i], lat_ref[i], lonVertex, latVertex)
+            print(' - Vertex closest to RefP{:d}: {:8.5f} {:8.5f}'.format(i+1, lonVertex[idx_sp1], latVertex[idx_sp1]))
+            out_i = self._get_path(idx_sp0, idx_sp1, lonVertex, latVertex, lonEdge, latEdge, \
+                                   indexToVertexID, edgesOnVertex, verticesOnEdge, debug_info)
+            out = out + out_i
+            idx_sp0 = idx_sp1
+        # last path, start from end points P1
+        out_n = self._get_path(idxP1, idx_sp1, lonVertex, latVertex, lonEdge, latEdge, \
+                               indexToVertexID, edgesOnVertex, verticesOnEdge, debug_info)
+        out = out + out_n.reverse()
+        return out
+
+    def _get_path(self, idxP0, idxP1, lonVertex, latVertex, lonEdge, latEdge, indexToVertexID, edgesOnVertex, verticesOnEdge, debug_info):
         # initialize arrays
         idx_edges_on_path    = []
         idx_vertices_on_path = []
@@ -79,18 +107,14 @@ class MPASMesh(object):
             edge_arr     = edgesOnVertex[idx_vertex_now,:]
             idx_edge_arr = edge_arr-1
             # compute the distance from P1
-            dist_p1 = []
-            dist_ref = []
+            dist = []
             idx_tmp = []
             for idx in idx_edge_arr:
                 if idx not in idx_edges_on_path:
                     loni = lonEdge[idx]
                     lati = latEdge[idx]
-                    dist_p1.append(gc_distance(loni, lati, lonP1, latP1))
-                    dist_ref.append(np.mean(gc_distance(loni, lati, lon_ref, lat_ref)))
+                    dist.append(gc_distance(loni, lati, lonVertex[idxP1], latVertex[idxP1]))
                     idx_tmp.append(idx)
-            # weighted distance
-            dist = np.array(dist_p1) + np.array(dist_ref) * weight_ref
             # print the location of the three edges
             if debug_info:
                 print('\nEdges on vertex:')
@@ -224,16 +248,43 @@ class MPASMesh(object):
 
         """Path on MPASMesh object"""
 
-        def __init__(self, mesh, idx_edge, idx_vertex, sign_edges, lon_edge, lat_edge, lon_vertex, lat_vertex):
+        def __init__(self, mesh=None, idx_edge=[], idx_vertex=[], sign_edges=[], lon_edge=[], lat_edge=[], lon_vertex=[], lat_vertex=[]):
 
             self.mesh = mesh
-            self.idx_edge = idx_edge
-            self.idx_vertex = idx_vertex
-            self.sign_edges = sign_edges
-            self.lon_edge = lon_edge
-            self.lat_edge = lat_edge
-            self.lon_vertex = lon_vertex
-            self.lat_vertex = lat_vertex
+            self.idx_edge = list(idx_edge)
+            self.idx_vertex = list(idx_vertex)
+            self.sign_edges = list(sign_edges)
+            self.lon_edge = list(lon_edge)
+            self.lat_edge = list(lat_edge)
+            self.lon_vertex = list(lon_vertex)
+            self.lat_vertex = list(lat_vertex)
+
+        def __add__(self, other):
+
+            if len(self.idx_vertex) == 0:
+                idx_v = 0
+            else:
+                idx_v = 1
+            for attr in self.__dict__.keys():
+                attr_val = getattr(self, attr)
+                if isinstance(attr_val, list):
+                    if 'vertex' in attr:
+                        attr_val.extend(getattr(other, attr)[idx_v:])
+                    else:
+                        attr_val.extend(getattr(other, attr))
+                    setattr(self, attr, attr_val)
+            return self
+
+        def reverse(self):
+
+            for attr in self.__dict__.keys():
+                attr_val = getattr(self, attr)
+                if isinstance(attr_val, list):
+                    attr_val.reverse()
+                    setattr(self, attr, attr_val)
+            self.sign_edges = [-1*val for val in self.sign_edges]
+            return self
+
 
         def plot_edge_center(self, m, s=1, **kwargs):
             x_e, y_e = m(self.lon_edge, self.lat_edge)
@@ -1032,7 +1083,11 @@ def get_index_latlon(loni, lati, lon_arr, lat_arr, search_range=5.0):
     p = tree.query(pts)
     cidx = p[1]
     idx = np.argwhere(lon_arr==lon_sub[cidx])
-    return idx[0][0]
+    for i in idx[0][:]:
+        if lat_arr[i] == lat_sub[cidx]:
+            out = i
+            break
+    return out
 
 def gc_radius():
     """Return the radius of Earth
