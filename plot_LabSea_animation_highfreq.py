@@ -8,13 +8,13 @@ def main():
     global lon, lat, refMidDepth, cellArea, refLayerThickness, bottomDepth
 
     # get paths of restart files, monthly mean output files, processed climatology files and output figures
-    ts_ys = 46
-    ts_ye = 55
-    plt_ys = 46
-    plt_ye = 55
+    ts_ys = 41
+    ts_ye = 50
+    plt_ys = 41
+    plt_ye = 50
     nmon = 12 # 12 for production and 1 for testing
     data_root = e3sm_res_cmp.load_paths_ocn(climo_ys=ts_ys, climo_ye=ts_ye,
-                                            ts_ys=ts_ys, ts_ye=ts_ye)
+                                            ts_ys=ts_ys, ts_ye=ts_ye, runname='gl-mesh-gm1800')
     rst_root = data_root['rst_root']
     mon_root = data_root['mon_root']
     fig_root = data_root['fig_root']
@@ -38,9 +38,17 @@ def main():
 
     # Salinity (psu)
 
-    varname = 'salinityAtSurface'
-    units = 'psu'
-    levels = np.linspace(28, 36, 41)
+    # varname = 'salinityAtSurface'
+    # units = 'psu'
+    # levels = np.linspace(28, 36, 41)
+
+    # MLD (m)
+
+    varname = 'dThreshMLD'
+    units = 'm'
+    levels = np.array([0, 10, 20, 30, 40, 50, 60, 70, 80, 90,
+                       110, 130, 150, 180, 210, 240, 280, 320, 360,
+                       407, 454, 500, 1000, 1500, 2000])
 
     fig_dir = fig_root+'/Animation/highfreq/'+varname
     os.makedirs(fig_dir, exist_ok=True)
