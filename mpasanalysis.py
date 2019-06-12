@@ -365,13 +365,36 @@ class MPASOData(object):
         out = MPASOMap(data=ncdata[:], mesh=self, name=name, units=units)
         return out
 
-    def get_transport(self, transect=None, path=None, varname=None, varname_prefix=''):
+    def get_transport(self, transect=None, path=None, varname=None, varname_prefix='', bolus=False):
         """Compute the transport of variable across transect
 
         :transect: (VerticalTransect object) transect
+        :path: (MPASMesh.Path) path of the transect
         :varname: (str) variable name
-        :varname: (str) variable name prefix (e.g., timeMonthly_avg_)
+        :varname_prefix: (str) variable name prefix (e.g., timeMonthly_avg_)
+        :bolus: (bool) Add GM bolus velocity if True
         :return: (float) transport
+
+        """
+
+        tran, dist = self.get_transport_cumulative(transect=transect,
+                                                   path=path,
+                                                   varname=varname,
+                                                   varname_prefix=varname_prefix,
+                                                   bolus=bolus)
+
+        transport = tran[:,-1]
+        return transport
+
+    def get_transport_cumulative(self, transect=None, path=None, varname=None, varname_prefix='', bolus=False):
+        """Compute the cumulative transport of variable across transect
+
+        :transect: (VerticalTransect object) transect
+        :path: (MPASMesh.Path) path of the transect
+        :varname: (str) variable name
+        :varname_prefix: (str) variable name prefix (e.g., timeMonthly_avg_)
+        :bolus: (bool) Add GM bolus velocity if True
+        :return: ([float, float]) transport, distance
 
         """
 
@@ -384,24 +407,31 @@ class MPASOData(object):
         sign_edges_1d = path.sign_edges
         dv_edge_1d = fmesh.variables['dvEdge'][idx_edge]
         normal_velocity = fdata.variables[varname_prefix+'normalVelocity'][:,idx_edge,:]
+        if bolus:
+            normal_gm_bolus_velocity = fdata.variables[varname_prefix+'normalGMBolusVelocity'][:,idx_edge,:]
+            normal_velocity = normal_velocity + normal_gm_bolus_velocity
+        cells_on_edge = fmesh.variables['cellsOnEdge'][idx_edge,:]
+        idx_cells_on_edge = cells_on_edge - 1
         if varname is None:
             var = np.ones(normal_velocity.shape)
         else:
-            var = fdata.variables[varname_prefix+'normalVelocity'][:,idx_edge,:]
-        cells_on_edge = fmesh.variables['cellsOnEdge'][idx_edge,:]
-        idx_cells_on_edge = cells_on_edge - 1
+            var_c0 = fdata.variables[varname_prefix+varname][:,idx_cells_on_edge[:,0],:]
+            var_c1 = fdata.variables[varname_prefix+varname][:,idx_cells_on_edge[:,1],:]
+            var = 0.5*(var_c0+var_c1)
         layer_thickness_c0 = fdata.variables[varname_prefix+'layerThickness'][:,idx_cells_on_edge[:,0],:]
         layer_thickness_c1 = fdata.variables[varname_prefix+'layerThickness'][:,idx_cells_on_edge[:,1],:]
         dh_edge = 0.5*(layer_thickness_c0+layer_thickness_c1)
-        nt = normal_velocity.shape[0]
-        nz = normal_velocity.shape[2]
+        nt, ne, nz = normal_velocity.shape
         dv_edge = np.transpose(np.tile(dv_edge_1d,[nz,1]))
         sign_edges = np.transpose(np.tile(sign_edges_1d,[nz,1]))
-        transport = np.zeros(nt)
+        transport = np.zeros([nt, ne+1])
         for i in np.arange(nt):
             tmp = normal_velocity[i,:,:]*var[i,:,:]*sign_edges*dv_edge*dh_edge[i,:,:]
-            transport[i] = np.sum(tmp)
-        return transport
+            transport[i, 1:] = np.cumsum(np.sum(tmp, axis=1))
+        dist = np.zeros(ne+1)
+        for j in np.arange(ne)+1:
+            dist[j] = gc_distance(path.lon_vertex[j], path.lat_vertex[j], path.lon_vertex[0], path.lat_vertex[0])
+        return transport, dist
 
 
 #--------------------------------
@@ -590,25 +620,25 @@ class MPASOMap(object):
         :mesh: (MPASMesh) mesh object
 
         """
-        assert data is not None, 'Data array \'data\' required.'
-        self.fillvalue = -9.99999979021476795361e+33
-        self.data = np.where(data<=self.fillvalue, np.nan, data)
-        self.name = name
-        self.units = units
-        self.mesh = mesh
-        if mesh is None:
-            assert lon is not None, 'Longitude array \'lon\' required.'
-            assert lat is not None, 'Latitude array \'lat\' required.'
-            assert cellarea is not None, 'Cell area array \'cellarea\' required.'
-            self.lon = lon
-            self.lat = lat
-            self.cellarea = cellarea
-        else:
-            print("Reading mesh data from {}".format(mesh.filepath))
-            fmesh = mesh.load()
-            self.lon = np.degrees(fmesh.variables['lonCell'][:])
-            self.lat = np.degrees(fmesh.variables['latCell'][:])
-            self.cellarea = fmesh.variables['areaCell'][:]
+        if data is not None:
+            self.fillvalue = -9.99999979021476795361e+33
+            self.data = np.where(data<=self.fillvalue, np.nan, data)
+            self.name = name
+            self.units = units
+            self.mesh = mesh
+            if mesh is None:
+                assert lon is not None, 'Longitude array \'lon\' required.'
+                assert lat is not None, 'Latitude array \'lat\' required.'
+                assert cellarea is not None, 'Cell area array \'cellarea\' required.'
+                self.lon = lon
+                self.lat = lat
+                self.cellarea = cellarea
+            else:
+                print("Reading mesh data from {}".format(mesh.filepath))
+                fmesh = mesh.load()
+                self.lon = np.degrees(fmesh.variables['lonCell'][:])
+                self.lat = np.degrees(fmesh.variables['latCell'][:])
+                self.cellarea = fmesh.variables['areaCell'][:]
 
     def save(self, filepath):
         """Save MPASOMap object
@@ -628,8 +658,10 @@ class MPASOMap(object):
 
         """
         dat = np.load(filepath)
+        if 'mesh' not in dat.keys():
+            mesh = None
         self.__init__(data=dat['data'], lon=dat['lon'], lat=dat['lat'], cellarea=dat['cellarea'], \
-                      name=str(dat['name']), units=str(dat['units']), mesh=dat['mesh'])
+                      name=str(dat['name']), units=str(dat['units']), mesh=mesh)
         return self
 
     def masked(self, mask, mask_data=np.nan):
@@ -715,7 +747,7 @@ class MPASOMap(object):
         return out
 
     def plot(self, axis=None, region='Global', ptype='scatter', levels=None,
-             label=None, add_title=True, add_colorbar=True, cmap='rainbow', **kwargs):
+             label=None, add_title=True, title=None, add_colorbar=True, cmap='rainbow', **kwargs):
         """Plot scatters on a map
 
         :axis: (matplotlib.axes, optional) axis to plot figure on
@@ -809,7 +841,10 @@ class MPASOMap(object):
                     bbox=dict(boxstyle='square',ec='k',fc='w'))
         # add title
         if add_title:
-            axis.set_title('{} ({})'.format(self.name, self.units))
+            if title is None:
+                axis.set_title('{} ({})'.format(self.name, self.units))
+            else:
+                axis.set_title(title)
         # add colorbar
         if add_colorbar:
             cb = m.colorbar(fig, ax=axis)
