@@ -1,12 +1,438 @@
 import os
 import sys
 import calendar
+import time
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.colors as colors
 from netCDF4 import Dataset
 from scipy import spatial
 from mpl_toolkits.basemap import Basemap
+from matplotlib.collections import LineCollection, PatchCollection
+from matplotlib.patches import Polygon
+
+#--------------------------------
+# MPASMesh
+#--------------------------------
+
+class MPASMesh(object):
+
+    """MPASMesh object"""
+
+    def __init__(self, filepath=None):
+        assert filepath is not None, 'Please set the path of MPAS mesh file.'
+        self.filepath = filepath
+
+    def load(self):
+        """read dataset
+        """
+        out = Dataset(self.filepath, 'r')
+        return out
+
+    def get_shortest_path(self, lonP0, latP0, lonP1, latP1, npoint_ref=1, debug_info=False):
+        """ Get the shorted path that connects two endpoints.
+
+        :lonP0: (float) Longitude of endpoint 0
+        :latP0: (float) Latitude of endpoint 0
+        :lonP1: (float) Longitude of endpoint 1
+        :latP1: (float) Latitude of endpoint 1
+        :npoint_ref: (int) number of reference points along the great circle
+        :weight_ref: (float) weight of reference points
+        :debug_info: (bool) print out additional debug information if True
+
+        """
+        fmesh           = self.load()
+        lonVertex       = np.degrees(fmesh.variables['lonVertex'][:])
+        latVertex       = np.degrees(fmesh.variables['latVertex'][:])
+        lonEdge         = np.degrees(fmesh.variables['lonEdge'][:])
+        latEdge         = np.degrees(fmesh.variables['latEdge'][:])
+        indexToVertexID = fmesh.variables['indexToVertexID'][:]
+        edgesOnVertex   = fmesh.variables['edgesOnVertex'][:]
+        verticesOnEdge  = fmesh.variables['verticesOnEdge'][:]
+
+        # find indices of endpoints
+        idxP0 = get_index_latlon(lonP0, latP0, lonVertex, latVertex)
+        idxP1 = get_index_latlon(lonP1, latP1, lonVertex, latVertex)
+        print('Vertex closest to P0: {:8.5f} {:8.5f}'.format(lonVertex[idxP0], latVertex[idxP0]))
+        print('Vertex closest to P1: {:8.5f} {:8.5f}'.format(lonVertex[idxP1], latVertex[idxP1]))
+        # find reference points
+        lon_ref, lat_ref = gc_interpolate(lonVertex[idxP0], latVertex[idxP0], \
+                                          lonVertex[idxP1], latVertex[idxP1], npoint_ref+2)
+        lon_ref = np.mod(lon_ref[1:-1], 360)
+        lat_ref = np.mod(lat_ref[1:-1], 360)
+        # initialize path
+        out = self.Path(mesh=self,
+                        idx_edge=[],
+                        idx_vertex=[],
+                        sign_edges=[],
+                        lon_edge=[],
+                        lat_edge=[],
+                        lon_vertex=[],
+                        lat_vertex=[])
+        # loop over reference points, find the path between these points
+        idx_sp0 = idxP0
+        for i in np.arange(npoint_ref):
+            idx_vertex = np.minimum(i,1)
+            idx_sp1 = get_index_latlon(lon_ref[i], lat_ref[i], lonVertex, latVertex)
+            print(' - Vertex closest to RefP{:d}: {:8.5f} {:8.5f}'.format(i+1, lonVertex[idx_sp1], latVertex[idx_sp1]))
+            out_i = self._get_path(idx_sp0, idx_sp1, lonVertex, latVertex, lonEdge, latEdge, \
+                                   indexToVertexID, edgesOnVertex, verticesOnEdge, debug_info)
+            out = out + out_i
+            idx_sp0 = idx_sp1
+        # last path, start from end points P1
+        out_n = self._get_path(idxP1, idx_sp1, lonVertex, latVertex, lonEdge, latEdge, \
+                               indexToVertexID, edgesOnVertex, verticesOnEdge, debug_info)
+        out = out + out_n.reverse()
+        return out
+
+    def _get_path(self, idxP0, idxP1, lonVertex, latVertex, lonEdge, latEdge, indexToVertexID, edgesOnVertex, verticesOnEdge, debug_info):
+        # initialize arrays
+        idx_edges_on_path    = []
+        idx_vertices_on_path = []
+        sign_edges = []
+        # start from vertex P0
+        idx_vertex_now = idxP0
+        # record vortices on path and the indices
+        idx_vertices_on_path.append(idx_vertex_now)
+        if debug_info:
+            print('\nVertex on path ({:d}): {:8.5f} {:8.5f}'.format(idx_vertex_now, lonVertex[idx_vertex_now], latVertex[idx_vertex_now]))
+
+        # continue if not reached P1
+        istep = 0
+        while idx_vertex_now != idxP1:
+            # print the step
+            if debug_info:
+                print('\nStep {:d}'.format(istep))
+            # find the indices of the three edges on vertex
+            edge_arr     = edgesOnVertex[idx_vertex_now,:]
+            idx_edge_arr = edge_arr-1
+            # compute the distance from P1
+            dist = []
+            idx_tmp = []
+            for idx in idx_edge_arr:
+                if idx not in idx_edges_on_path:
+                    loni = lonEdge[idx]
+                    lati = latEdge[idx]
+                    dist.append(gc_distance(loni, lati, lonVertex[idxP1], latVertex[idxP1]))
+                    idx_tmp.append(idx)
+            # print the location of the three edges
+            if debug_info:
+                print('\nEdges on vertex:')
+                for i, idx in enumerate(idx_tmp):
+                    print('   Edge {:d} ({:d}): {:8.5f} {:8.5f} ({:10.4f})'.\
+                          format(i, idx, lonEdge[idx], latEdge[idx], dist[i]))
+            # choose the edge from the three that is closest to vertex P1
+            idx_min = np.argmin(dist)
+            idx_edge_next = idx_tmp[idx_min]
+            # print the edge on path
+            if debug_info:
+                print('\nEdge on path : [Edge {:d} ({:d})] {:8.5f} {:8.5f}'.\
+                      format(idx_min, idx_edge_next, lonEdge[idx_edge_next], latEdge[idx_edge_next]))
+            # record edges on path and the indices
+            idx_edges_on_path.append(idx_edge_next)
+            # find the other vertex on this edge
+            vertex_arr = verticesOnEdge[idx_edge_next,:]
+            if vertex_arr[0] == indexToVertexID[idx_vertex_now]:
+                vertex_next = vertex_arr[1]
+                sign_edges.append(1)
+            else:
+                vertex_next = vertex_arr[0]
+                sign_edges.append(-1)
+            idx_vertex_next = vertex_next-1
+            # record vortices on path and the indices
+            idx_vertices_on_path.append(idx_vertex_next)
+            if debug_info:
+                print('\nVertex on path ({:d}): {:8.5f} {:8.5f}'.\
+                      format(idx_vertex_next, lonVertex[idx_vertex_next], latVertex[idx_vertex_next]))
+            # move to next vertex
+            idx_vertex_now  = idx_vertex_next
+            # count steps
+            istep += 1
+
+        # create a path on MPAS mesh
+        lon_edge = lonEdge[idx_edges_on_path]
+        lat_edge = latEdge[idx_edges_on_path]
+        lon_vertex = lonVertex[idx_vertices_on_path]
+        lat_vertex = latVertex[idx_vertices_on_path]
+        out = self.Path(mesh=self,
+                        idx_edge=idx_edges_on_path,
+                        idx_vertex=idx_vertices_on_path,
+                        sign_edges=sign_edges,
+                        lon_edge=lon_edge,
+                        lat_edge=lat_edge,
+                        lon_vertex=lon_vertex,
+                        lat_vertex=lat_vertex)
+        return out
+
+    def get_closed_path_cell(self, idx_cell):
+        """Get the closed path around a cell defined by all the edges on cell.
+
+        :idx_cell: (int) index for cell
+
+        """
+
+        # load mesh
+        fmesh        = self.load()
+        nedges       = fmesh.variables['nEdgesOnCell'][idx_cell]
+        idx_edges    = fmesh.variables['edgesOnCell'][idx_cell,:nedges]-1
+        idx_vertices = fmesh.variables['verticesOnCell'][idx_cell,:nedges]-1
+        idx_vertices = np.append(idx_vertices, idx_vertices[0])
+        lon_edges    = np.degrees(fmesh.variables['lonEdge'][idx_edges])
+        lat_edges    = np.degrees(fmesh.variables['latEdge'][idx_edges])
+        lon_vertices = np.degrees(fmesh.variables['lonVertex'][idx_vertices])
+        lat_vertices = np.degrees(fmesh.variables['latVertex'][idx_vertices])
+        sign_edges = np.ones(nedges)
+        for i in np.arange(nedges):
+            tmp_idx_vertices = fmesh.variables['verticesOnEdge'][idx_edges[i],:]-1
+            if tmp_idx_vertices[1] == idx_vertices[i]:
+                sign_edges[i] = -1
+        # create a path
+        out = self.Path(mesh=self,
+                        idx_edge=idx_edges,
+                        idx_vertex=idx_vertices,
+                        sign_edges=sign_edges,
+                        lon_edge=lon_edges,
+                        lat_edge=lat_edges,
+                        lon_vertex=lon_vertices,
+                        lat_vertex=lat_vertices)
+        return out
+
+    def get_map(self, varname, name=None, units=None):
+        """Get map for variable
+
+        :varname: (str) variable name
+        :name: (str) name of variable, optional
+        :units: (str) units of variable, optional
+
+        """
+
+        ncdata = self.load().variables[varname]
+        if name is None:
+            name = ncdata.long_name
+        if units is None:
+            units = ncdata.units
+        out = MPASOMap(data=ncdata[:], mesh=self, name=name, units=units)
+        return out
+
+    def plot_edges(self, m, **kwargs):
+        fmesh = self.load()
+        lonEdge         = np.degrees(fmesh.variables['lonEdge'][:])
+        latEdge         = np.degrees(fmesh.variables['latEdge'][:])
+        lonVertex       = np.degrees(fmesh.variables['lonVertex'][:])
+        latVertex       = np.degrees(fmesh.variables['latVertex'][:])
+        verticesOnEdge  = fmesh.variables['verticesOnEdge'][:]
+        lines = []
+        lonmax = np.mod(m.lonmax, 360)
+        lonmin = np.mod(m.lonmin, 360)
+        latmax = m.latmax
+        latmin = m.latmin
+        idx = (lonEdge <= lonmax) & (lonEdge >= lonmin) & \
+              (latEdge <= latmax) & (latEdge >= latmin)
+        verticesOnEdge_arr = verticesOnEdge[idx,:]
+        nedges=verticesOnEdge_arr.shape[0]
+        for i in np.arange(nedges):
+            idx_vertex0 = verticesOnEdge_arr[i,0]-1
+            idx_vertex1 = verticesOnEdge_arr[i,1]-1
+            lonP0 = lonVertex[idx_vertex0]
+            latP0 = latVertex[idx_vertex0]
+            lonP1 = lonVertex[idx_vertex1]
+            latP1 = latVertex[idx_vertex1]
+            x0, y0 = m(lonP0, latP0)
+            x1, y1 = m(lonP1, latP1)
+            lines.append([(x0, y0), (x1, y1)])
+        lc = LineCollection(lines, **kwargs)
+        out = m.ax.add_collection(lc)
+        return out
+
+    class Path(object):
+
+        """Path on MPASMesh object"""
+
+        def __init__(self, mesh=None, idx_edge=[], idx_vertex=[], sign_edges=[], lon_edge=[], lat_edge=[], lon_vertex=[], lat_vertex=[]):
+
+            self.mesh = mesh
+            self.idx_edge = list(idx_edge)
+            self.idx_vertex = list(idx_vertex)
+            self.sign_edges = list(sign_edges)
+            self.lon_edge = list(lon_edge)
+            self.lat_edge = list(lat_edge)
+            self.lon_vertex = list(lon_vertex)
+            self.lat_vertex = list(lat_vertex)
+
+        def __add__(self, other):
+
+            if len(self.idx_vertex) == 0:
+                idx_v = 0
+            else:
+                idx_v = 1
+            for attr in self.__dict__.keys():
+                attr_val = getattr(self, attr)
+                if isinstance(attr_val, list):
+                    if 'vertex' in attr:
+                        attr_val.extend(getattr(other, attr)[idx_v:])
+                    else:
+                        attr_val.extend(getattr(other, attr))
+                    setattr(self, attr, attr_val)
+            return self
+
+        def reverse(self):
+
+            for attr in self.__dict__.keys():
+                attr_val = getattr(self, attr)
+                if isinstance(attr_val, list):
+                    attr_val.reverse()
+                    setattr(self, attr, attr_val)
+            self.sign_edges = [-1*val for val in self.sign_edges]
+            return self
+
+
+        def plot_edge_center(self, m, s=1, **kwargs):
+            x_e, y_e = m(self.lon_edge, self.lat_edge)
+            out = m.scatter(x_e, y_e, s=s, **kwargs)
+            return out
+
+        def plot_vertex(self, m, s=1, **kwargs):
+            x_v, y_v = m(self.lon_vertex, self.lat_vertex)
+            out = m.scatter(x_v, y_v, s=s, **kwargs)
+            return out
+
+        def plot_edge(self, m, **kwargs):
+            x_e, y_e = m(self.lon_vertex, self.lat_vertex)
+            out = m.plot(x_e, y_e, **kwargs)
+            return out
+
+#--------------------------------
+# MPASOData
+#--------------------------------
+
+class MPASOData(object):
+
+    """MPASOData object"""
+
+    def __init__(self, filepath=None, filepath_mesh=None):
+        """Initialize MPASOData
+
+        :filepath: (str) path of MPASO data file
+        :filepath_mesh: (str) path of corresponding mesh file
+
+        """
+        assert filepath is not None, 'Please set the path of MPAS data file.'
+        assert filepath_mesh is not None, 'Please set the path of corresponding mesh file.'
+        self.filepath = filepath
+        self.mesh = MPASMesh(filepath=filepath_mesh)
+
+    def load(self):
+        """read dataset
+
+        :return: (netCDF4.Dataset) netcdf data
+
+        """
+        out = Dataset(self.filepath, 'r')
+        return out
+
+    def get_volume(self, varname, name=None, units=None):
+        """Get volume for variable
+
+        :varname: (str) variable name
+        :name: (str) name of variable, optional
+        :units: (str) units of variable, optional
+        :return: (MPASOVolume object) volume
+
+        """
+        ncdata = self.load().variables[varname]
+        if name is None:
+            name = ncdata.long_name
+        if units is None:
+            units = ncdata.units
+        out = MPASOVolume(data=ncdata[:], mesh=self.mesh, name=name, units=units)
+        return out
+
+    def get_map(self, varname, name=None, units=None):
+        """Get map for variable
+
+        :varname: (str) variable name
+        :name: (str) name of variable, optional
+        :units: (str) units of variable, optional
+        :return: (MPASOMap object) map
+
+        """
+
+        ncdata = self.load().variables[varname]
+        if name is None:
+            name = ncdata.long_name
+        if units is None:
+            units = ncdata.units
+        out = MPASOMap(data=ncdata[:], mesh=self, name=name, units=units)
+        return out
+
+    def get_transport(self, transect=None, path=None, varname=None, varname_prefix='', bolus=False):
+        """Compute the transport of variable across transect
+
+        :transect: (VerticalTransect object) transect
+        :path: (MPASMesh.Path) path of the transect
+        :varname: (str) variable name
+        :varname_prefix: (str) variable name prefix (e.g., timeMonthly_avg_)
+        :bolus: (bool) Add GM bolus velocity if True
+        :return: (float) transport
+
+        """
+
+        tran, dist = self.get_transport_cumulative(transect=transect,
+                                                   path=path,
+                                                   varname=varname,
+                                                   varname_prefix=varname_prefix,
+                                                   bolus=bolus)
+
+        transport = tran[:,-1]
+        return transport
+
+    def get_transport_cumulative(self, transect=None, path=None, varname=None, varname_prefix='', bolus=False):
+        """Compute the cumulative transport of variable across transect
+
+        :transect: (VerticalTransect object) transect
+        :path: (MPASMesh.Path) path of the transect
+        :varname: (str) variable name
+        :varname_prefix: (str) variable name prefix (e.g., timeMonthly_avg_)
+        :bolus: (bool) Add GM bolus velocity if True
+        :return: ([float, float]) transport, distance
+
+        """
+
+        fdata = self.load()
+        fmesh = self.mesh.load()
+        if path is None:
+            assert transect is not None, 'Transect \'transect\' required if \'path\' is not set.'
+            path = self.mesh.get_shortest_path(transect.lon0, transect.lat0, transect.lon1, transect.lat1)
+        idx_edge = path.idx_edge
+        sign_edges_1d = path.sign_edges
+        dv_edge_1d = fmesh.variables['dvEdge'][idx_edge]
+        normal_velocity = fdata.variables[varname_prefix+'normalVelocity'][:,idx_edge,:]
+        if bolus:
+            normal_gm_bolus_velocity = fdata.variables[varname_prefix+'normalGMBolusVelocity'][:,idx_edge,:]
+            normal_velocity = normal_velocity + normal_gm_bolus_velocity
+        cells_on_edge = fmesh.variables['cellsOnEdge'][idx_edge,:]
+        idx_cells_on_edge = cells_on_edge - 1
+        if varname is None:
+            var = np.ones(normal_velocity.shape)
+        else:
+            var_c0 = fdata.variables[varname_prefix+varname][:,idx_cells_on_edge[:,0],:]
+            var_c1 = fdata.variables[varname_prefix+varname][:,idx_cells_on_edge[:,1],:]
+            var = 0.5*(var_c0+var_c1)
+        layer_thickness_c0 = fdata.variables[varname_prefix+'layerThickness'][:,idx_cells_on_edge[:,0],:]
+        layer_thickness_c1 = fdata.variables[varname_prefix+'layerThickness'][:,idx_cells_on_edge[:,1],:]
+        dh_edge = 0.5*(layer_thickness_c0+layer_thickness_c1)
+        nt, ne, nz = normal_velocity.shape
+        dv_edge = np.transpose(np.tile(dv_edge_1d,[nz,1]))
+        sign_edges = np.transpose(np.tile(sign_edges_1d,[nz,1]))
+        transport = np.zeros([nt, ne+1])
+        for i in np.arange(nt):
+            tmp = normal_velocity[i,:,:]*var[i,:,:]*sign_edges*dv_edge*dh_edge[i,:,:]
+            transport[i, 1:] = np.cumsum(np.sum(tmp, axis=1))
+        dist = np.zeros(ne+1)
+        for j in np.arange(ne)+1:
+            dist[j] = gc_distance(path.lon_vertex[j], path.lat_vertex[j], path.lon_vertex[0], path.lat_vertex[0])
+        return transport, dist
+
 
 #--------------------------------
 # MPASOVolume
@@ -16,7 +442,8 @@ class MPASOVolume(object):
 
     """MPASOVolume object"""
 
-    def __init__(self, data, lon, lat, depth, cellarea, layerthickness, bottomdepth, name, units):
+    def __init__(self, data=None, lon=None, lat=None, depth=None, cellarea=None, \
+                 layerthickness=None, bottomdepth=None, name=None, units=None, mesh=None):
         """Iniitalize MPASOVolume
 
         :data: (1D numpy array) data at each location
@@ -28,18 +455,43 @@ class MPASOVolume(object):
         :bottomdepth: (1D numpy array) depth of bottom
         :name: (str) name of variable
         :units: (str) units of variable
+        :mesh: (MPASMesh) mesh object
 
         """
+        assert data is not None, 'Data array \'data\' required.'
         self.fillvalue = -9.99999979021476795361e+33
         self.data = np.where(data<=self.fillvalue, np.nan, data)
-        self.lon = lon
-        self.lat = lat
-        self.depth = depth
-        self.cellarea = cellarea
-        self.layerthickness = layerthickness
-        self.bottomdepth = bottomdepth
         self.name = name
         self.units = units
+        self.mesh = mesh
+        if mesh is None:
+            assert lon is not None, 'Longitude array \'lon\' required.'
+            assert lat is not None, 'Latitude array \'lat\' required.'
+            assert depth is not None, 'Depth array \'depth\' required.'
+            assert cellarea is not None, 'Cell area array \'cellarea\' required.'
+            assert layerthickness is not None, 'Layer thickness array \'layerthickness\' required.'
+            assert bottomdepth is not None, 'Bottom depth array \'bottomdepth\' required.'
+            self.lon = lon
+            self.lat = lat
+            self.depth = depth
+            self.cellarea = cellarea
+            self.layerthickness = layerthickness
+            self.bottomdepth = bottomdepth
+        else:
+            print("Reading mesh data from {}".format(mesh.filepath))
+            fmesh = mesh.load()
+            self.lon = np.degrees(fmesh.variables['lonCell'][:])
+            self.lat = np.degrees(fmesh.variables['latCell'][:])
+            self.cellarea = fmesh.variables['areaCell'][:]
+            self.bottomdepth = fmesh.variables['bottomDepth'][:]
+            refbottomdepth = fmesh.variables['refBottomDepth'][:]
+            nvertlevels = len(refbottomdepth)
+            reftopdepth = np.zeros(nvertlevels)
+            reftopdepth[1:nvertlevels] = refbottomdepth[0:nvertlevels-1]
+            reflayerthickness = reftopdepth-refbottomdepth
+            refmiddepth = 0.5*(reftopdepth+refbottomdepth)
+            self.depth = refmiddepth
+            self.layerthickness = reflayerthickness
 
     def get_map(self, depth=0.0):
         """ Return a map at depth
@@ -156,7 +608,7 @@ class MPASOMap(object):
 
     """MPASOMap object"""
 
-    def __init__(self, data=None, lon=None, lat=None, cellarea=None, name=None, units=None):
+    def __init__(self, data=None, lon=None, lat=None, cellarea=None, name=None, units=None, mesh=None):
         """Initialize MPASOMap
 
         :data: (1D numpy array) data at each location
@@ -165,37 +617,51 @@ class MPASOMap(object):
         :cellarea: (1D numpy array) area of cells
         :name: (str) name of variable
         :units: (str) units of variable
+        :mesh: (MPASMesh) mesh object
 
         """
-        self.fillvalue = -9.99999979021476795361e+33
-        self.lon = lon
-        self.lat = lat
-        self.cellarea = cellarea
-        self.name = name
-        self.units = units
         if data is not None:
+            self.fillvalue = -9.99999979021476795361e+33
             self.data = np.where(data<=self.fillvalue, np.nan, data)
+            self.name = name
+            self.units = units
+            self.mesh = mesh
+            if mesh is None:
+                assert lon is not None, 'Longitude array \'lon\' required.'
+                assert lat is not None, 'Latitude array \'lat\' required.'
+                assert cellarea is not None, 'Cell area array \'cellarea\' required.'
+                self.lon = lon
+                self.lat = lat
+                self.cellarea = cellarea
+            else:
+                print("Reading mesh data from {}".format(mesh.filepath))
+                fmesh = mesh.load()
+                self.lon = np.degrees(fmesh.variables['lonCell'][:])
+                self.lat = np.degrees(fmesh.variables['latCell'][:])
+                self.cellarea = fmesh.variables['areaCell'][:]
 
-    def save(self, path):
+    def save(self, filepath):
         """Save MPASOMap object
 
-        :path: (str) path of file to save
+        :filepath: (str) path of file to save
         :returns: none
 
         """
-        np.savez(path, data=self.data, lon=self.lon, lat=self.lat, cellarea=self.cellarea,
-                 name=self.name, units=self.units)
+        np.savez(filepath, data=self.data, lon=self.lon, lat=self.lat, cellarea=self.cellarea, \
+                 name=self.name, units=self.units, mesh=self.mesh)
 
-    def load(self, path):
+    def load(self, filepath):
         """Load data to MPASOMap object
 
-        :path: (str) path of file to load
+        :filepath: (str) path of file to load
         :returns: (MPASOMap object)
 
         """
-        dat = np.load(path)
-        self.__init__(data=dat['data'], lon=dat['lon'], lat=dat['lat'],
-                cellarea=dat['cellarea'], name=str(dat['name']), units=str(dat['units']))
+        dat = np.load(filepath)
+        if 'mesh' not in dat.keys():
+            mesh = None
+        self.__init__(data=dat['data'], lon=dat['lon'], lat=dat['lat'], cellarea=dat['cellarea'], \
+                      name=str(dat['name']), units=str(dat['units']), mesh=mesh)
         return self
 
     def masked(self, mask, mask_data=np.nan):
@@ -229,7 +695,7 @@ class MPASOMap(object):
         else:
             if region == 'Custom':
                 assert all(x is not None for x in [lon_min, lat_min, lon_max, lat_max]),\
-                    "Provide lon_min, lat_min, lon_max, and lat_max to customize region"
+                    'Provide lon_min, lat_min, lon_max, and lat_max to customize region'
                 lon_ll, lat_ll, lon_ur, lat_ur = lon_min, lat_min, lon_max, lat_max
             else:
                 # region mask
@@ -246,8 +712,42 @@ class MPASOMap(object):
             mean = np.sum(data*cellarea)/np.sum(cellarea)
         return mean
 
+    def _pcolor(self, m, **kwargs):
+        assert self.mesh is not None, 'Mesh file required for pcolor.'
+        fmesh = self.mesh.load()
+        lonCell         = np.degrees(fmesh.variables['lonCell'][:])
+        latCell         = np.degrees(fmesh.variables['latCell'][:])
+        lonVertex       = np.degrees(fmesh.variables['lonVertex'][:])
+        latVertex       = np.degrees(fmesh.variables['latVertex'][:])
+        verticesOnCell  = fmesh.variables['verticesOnCell'][:]
+        nEdgesOnCell    = fmesh.variables['nEdgesOnCell'][:]
+        # subset
+        lonmax = np.mod(m.lonmax, 360)
+        lonmin = np.mod(m.lonmin, 360)
+        latmax = m.latmax
+        latmin = m.latmin
+        idx = (lonCell <= lonmax) & (lonCell >= lonmin) & \
+              (latCell <= latmax) & (latCell >= latmin)
+        verticesOnCell_arr = verticesOnCell[idx,:]
+        nEdgesOnCell_arr = nEdgesOnCell[idx]
+        data = self.data[idx]
+        # patches
+        patches = []
+        ncell=verticesOnCell_arr.shape[0]
+        for i in np.arange(ncell):
+            idx_v = verticesOnCell_arr[i,:nEdgesOnCell_arr[i]]-1
+            lonp = lonVertex[idx_v]
+            latp = latVertex[idx_v]
+            xp, yp = m(lonp, latp)
+            patches.append(Polygon(list(zip(xp,yp))))
+        pc = PatchCollection(patches, **kwargs)
+        pc.set_array(data)
+        pc.set_lw(0.1)
+        out = m.ax.add_collection(pc)
+        return out
+
     def plot(self, axis=None, region='Global', ptype='scatter', levels=None,
-             label=None, add_title=True, add_colorbar=True, cmap='rainbow', **kwargs):
+             label=None, add_title=True, title=None, add_colorbar=True, cmap='rainbow', **kwargs):
         """Plot scatters on a map
 
         :axis: (matplotlib.axes, optional) axis to plot figure on
@@ -265,18 +765,11 @@ class MPASOMap(object):
         # use curret axis if not specified
         if axis is None:
             axis = plt.gca()
-        # plot map
+        # print message
+        print('Plotting map of {} at region \'{}\''.format(self.name+' ('+self.units+')', region))
+        m = plot_basemap(region=region, axis=axis)
+        # process data
         if region == 'Global':
-            # global map
-            lon_ll = 20.0
-            lat_ll = -80.0
-            lon_ur = 380.0
-            lat_ur = 80.0
-            m = Basemap(projection='cyl', llcrnrlat=lat_ll, urcrnrlat=lat_ur,
-                    llcrnrlon=lon_ll, urcrnrlon=lon_ur, ax=axis)
-            # parallels and meridians
-            mdlat = 30.0
-            mdlon = 60.0
             # markersize
             markersize = 1
             # data
@@ -290,30 +783,19 @@ class MPASOMap(object):
             # regional map
             region_obj = region_latlon(region)
             lon_ll, lat_ll, lon_ur, lat_ur = region_obj.lon_ll, region_obj.lat_ll, region_obj.lon_ur, region_obj.lat_ur
-            lon_c = 0.5*(lon_ll+lon_ur)
-            lat_c = 0.5*(lat_ll+lat_ur)
-            m = Basemap(projection='cass', llcrnrlon=lon_ll, llcrnrlat=lat_ll,
-                    urcrnrlon=lon_ur, urcrnrlat=lat_ur, resolution='l', lon_0=lon_c, lat_0=lat_c, ax=axis)
-            # parallels and meridians
-            mdlat = 10.0
-            mdlon = 10.0
             # region mask
-            lon_mask = (self.lon >= lon_ll-26.0) & (self.lon <= lon_ur)
-            lat_mask = (self.lat >= lat_ll) & (self.lat <= lat_ur+4.0)
+            lonmax = np.mod(m.lonmax, 360)
+            lonmin = np.mod(m.lonmin, 360)
+            latmax = m.latmax
+            latmin = m.latmin
+            lon_mask = (self.lon <= lonmax) & (self.lon >= lonmin)
+            lat_mask = (self.lat <= latmax) & (self.lat >= latmin)
             region_mask = lon_mask & lat_mask
             # apply region mask to data
             data = self.data[region_mask]
             lat = self.lat[region_mask]
             lon = self.lon[region_mask]
             cellarea = self.cellarea[region_mask]
-        # print message
-        print('Plotting map of {} at region \'{}\''.format(self.name+' ('+self.units+')', region))
-        # plot coastlines, draw label meridians and parallels.
-        m.drawcoastlines(zorder=3)
-        m.drawmapboundary(fill_color='lightgray')
-        m.fillcontinents(color='gray',lake_color='lightgray', zorder=2)
-        m.drawparallels(np.arange(-90.,91.,mdlat), labels=[1,0,0,1])
-        m.drawmeridians(np.arange(-180.,181.,mdlon), labels=[1,0,0,1])
         if levels is not None:
             # manually mapping levels to the colormap if levels is passed in,
             bounds = np.array(levels)
@@ -347,6 +829,8 @@ class MPASOMap(object):
             x, y = m(lon, lat)
             fig = m.contourf(x, y, data, tri=True, levels=levels, extend='both',
                         norm=norm, cmap=plt.cm.get_cmap(cmap), **kwargs)
+        elif ptype == 'pcolor':
+            fig = self._pcolor(m, norm=norm, cmap=plt.cm.get_cmap(cmap), alpha=1.0, **kwargs)
         else:
             raise ValueError('Plot type {} not supported.'.format(ptype))
         # add label
@@ -357,7 +841,10 @@ class MPASOMap(object):
                     bbox=dict(boxstyle='square',ec='k',fc='w'))
         # add title
         if add_title:
-            axis.set_title('{} ({})'.format(self.name, self.units))
+            if title is None:
+                axis.set_title('{} ({})'.format(self.name, self.units))
+            else:
+                axis.set_title(title)
         # add colorbar
         if add_colorbar:
             cb = m.colorbar(fig, ax=axis)
@@ -499,14 +986,60 @@ class MPASCICEMap(MPASOMap):
 # Vertical transsect object
 #--------------------------------
 class VerticalTransect(object):
+
     """Vertical transect along the great circle defined by two endpoints"""
+
     def __init__(self, name=None, lon0=None, lat0=None, lon1=None, lat1=None, depth=None):
-        self.name = name
-        self.lon0 = lon0
-        self.lat0 = lat0
-        self.lon1 = lon1
-        self.lat1 = lat1
-        self.depth = depth
+        """Initialize VerticalTransect
+
+        :name: (str) trasect name
+        :lon0: (float) longitude of endpoint 0
+        :lat0: (float) latitude of endpoint 0
+        :lon1: (float) longitude of endpoint 1
+        :lat1: (float) latitude of endpoint 1
+        :depth: (float) maximum depth of transect
+
+        """
+        if name == 'AR7W':
+            print('Pre-defined transect \'{}\'.'.format(name))
+            self.name=name
+            self.lon0=304
+            self.lat0=53.5
+            self.lon1=312
+            self.lat1=61
+            self.depth=4500.0
+        elif name == 'Davis Strait':
+            print('Pre-defined transect \'{}\'.'.format(name))
+            self.name=name
+            self.lon0=298.5
+            self.lat0=66.5
+            self.lon1=306
+            self.lat1=67
+            self.depth=1500.0
+        elif name == 'Hudson Strait':
+            print('Pre-defined transect \'{}\'.'.format(name))
+            self.name=name
+            self.lon0=295.2
+            self.lat0=60.4
+            self.lon1=293.7
+            self.lat1=61.9
+            self.depth=1000.0
+        elif name == 'LabSea Center':
+            print('Pre-defined transect \'{}\'.'.format(name))
+            self.name=name
+            self.lon0=296
+            self.lat0=63
+            self.lon1=320
+            self.lat1=50
+            self.depth=4500.0
+        else:
+            print('User defined transect \'{}\'.'.format(name))
+            self.name = name
+            self.lon0 = lon0
+            self.lat0 = lat0
+            self.lon1 = lon1
+            self.lat1 = lat1
+            self.depth = depth
 
     def interpolate(self, npoints):
         """Interpolate along great circle."""
@@ -545,45 +1078,6 @@ class region(object):
 # Functions
 #--------------------------------
 
-def transect(name):
-    """Return VerticalTransect object given the name
-
-    :name: (str) transect name
-    :return: (VerticalTransect object) transect
-
-    """
-    if name == 'AR7W':
-        out = VerticalTransect(name=name,
-                               lon0=304,
-                               lat0=53.5,
-                               lon1=312,
-                               lat1=61,
-                               depth=4500.0)
-    elif name == 'Davis Strait':
-        out = VerticalTransect(name=name,
-                               lon0=298.5,
-                               lat0=66.5,
-                               lon1=306,
-                               lat1=67,
-                               depth=1500.0)
-    elif name == 'Hudson Strait':
-        out = VerticalTransect(name=name,
-                               lon0=295.2,
-                               lat0=60.4,
-                               lon1=293.7,
-                               lat1=61.9,
-                               depth=1000.0)
-    elif name == 'LabSea Center':
-        out = VerticalTransect(name=name,
-                               lon0=296,
-                               lat0=63,
-                               lon1=320,
-                               lat1=50,
-                               depth=4500.0)
-    else:
-        raise ValueError('Transect \'{}\' not found.'.format(name) )
-    return out
-
 def region_latlon(region_name):
     """Return longitude and latitude of lower left an upper right of the region.
 
@@ -603,80 +1097,32 @@ def region_latlon(region_name):
         raise ValueError('Region {} not supported.'.format(region_name))
     return rg
 
-def select_path(lonP0, latP0, lonP1, latP1,
-                lonVertex, latVertex, lonEdge, latEdge,
-                indexToEdgeID, indexToVertexID,
-                edgesOnVertex, verticesOnEdge,
-                debug_info=False):
-    """ Select the edges and vertices on a path given by the two endpoints.
+def get_index_latlon(loni, lati, lon_arr, lat_arr, search_range=5.0):
+    """Get the index of the location (loni, lati) in an array of
+       locations (lon_arr, lat_arr)
+
+    :loni: (float) Longitude of target location
+    :lati: (float) Latitude of target location
+    :lon_arr: (float) array of Longitude
+    :lat_arr: (float) array of Latitude
+    :search_range: (float) range of longitude and latitude for faster search
+
     """
-    idxP0 = get_index_latlon([lonP0], [latP0], lonVertex, latVertex)
-    idxP1 = get_index_latlon([lonP1], [latP1], lonVertex, latVertex)
-    print('Vertex closest to P0: {:4.1f} {:4.1f}'.format(lonVertex[idxP0], latVertex[idxP0]))
-    print('Vertex closest to P1: {:4.1f} {:4.1f}'.format(lonVertex[idxP1], latVertex[idxP1]))
-    # initialize arrays
-    edges_on_path        = []
-    idx_edges_on_path    = []
-    vertices_on_path     = []
-    idx_vertices_on_path = []
-    # start from vertex P0
-    idx_vertex_now = idxP0
-    # record vortices on path and the indices
-    vertices_on_path.append(indexToVertexID[idx_vertex_now])
-    idx_vertices_on_path.append(idx_vertex_now)
-    if debug_info:
-        print('Vertex on path: {:4.1f} {:4.1f}'.format(lonVertex[idx_vertex_now], latVertex[idx_vertex_now]))
-
-    # continue if not reached P1
-    while idx_vertex_now != idxP1:
-
-        # find the indices of the three edges on vertex
-        edge_arr     = edgesOnVertex[idx_vertex_now,:]
-        idx_edge_arr = [np.where(indexToEdgeID==val)[0][0] for val in edge_arr]
-        # print the location of the three edges
-        if debug_info:
-            for i in np.arange(len(idx_edge_arr)):
-                print('   Edge {:d}: {:4.1f} {:4.1f}'.\
-                      format(i, lonEdge[idx_edge_arr[i]], latEdge[idx_edge_arr[i]]))
-        # choose the edge from the three that is closest to vertex P1
-        dist = [gc_distance(loni, lati, lonP1, latP1) \
-                for (loni, lati) in zip(lonEdge[idx_edge_arr], latEdge[idx_edge_arr])]
-        idx3_next     = np.argmin(dist)
-        edge_next     = edge_arr[idx3_next]
-        idx_edge_next = np.where(indexToEdgeID==edge_next)[0][0]
-        # print the edge on path
-        if debug_info:
-            print('Edge on path: [Edge {:d}] {:4.1f} {:4.1f}'.\
-                  format(idx3_next, lonEdge[idx_edge_arr[idx3_next]], latEdge[idx_edge_arr[idx3_next]]))
-        # record edges on path and the indices
-        edges_on_path.append(edge_next)
-        idx_edges_on_path.append(idx_edge_next)
-
-        # find the other vertex on this edge
-        vertex_arr      = verticesOnEdge[idx_edge_next,:]
-        vertex_next     = vertex_arr[vertex_arr!=indexToVertexID[idx_vertex_now]][0]
-        idx_vertex_next = np.where(indexToVertexID==vertex_next)[0][0]
-        # record vortices on path and the indices
-        vertices_on_path.append(vertex_next)
-        idx_vertices_on_path.append(idx_vertex_next)
-        if debug_info:
-            print('Vertex on path: {:4.1f} {:4.1f}'.\
-                  format(lonVertex[idx_vertex_next], latVertex[idx_vertex_next]))
-        # move to next vertex
-        idx_vertex_now  = idx_vertex_next
-
-    out = {'edge': edges_on_path,
-           'edge_idx': idx_edges_on_path,
-           'vertex': vertices_on_path,
-           'vertex_idx': idx_vertices_on_path}
-    return out
-
-def get_index_latlon(loni, lati, lon_arr, lat_arr):
-    pts = np.array(list(zip(loni,lati)))
-    tree = spatial.KDTree(list(zip(lon_arr, lat_arr)))
+    lon_mask = (lon_arr>=loni-search_range) & (lon_arr<=loni+search_range)
+    lat_mask = (lat_arr>=lati-search_range) & (lat_arr<=lati+search_range)
+    lonlat_mask = lon_mask & lat_mask
+    lon_sub = lon_arr[lonlat_mask]
+    lat_sub = lat_arr[lonlat_mask]
+    pts = np.array([loni,lati])
+    tree = spatial.KDTree(list(zip(lon_sub, lat_sub)))
     p = tree.query(pts)
     cidx = p[1]
-    return cidx[0]
+    idx = np.argwhere(lon_arr==lon_sub[cidx])
+    for i in idx[0][:]:
+        if lat_arr[i] == lat_sub[cidx]:
+            out = i
+            break
+    return out
 
 def gc_radius():
     """Return the radius of Earth
@@ -767,6 +1213,41 @@ def gc_interpolate(lon0, lat0, lon1, lat1, npoints):
     lat_out = np.arctan2(z, np.sqrt(x**2 + y**2))
     lon_out = np.arctan2(y, x)
     return np.degrees(lon_out), np.degrees(lat_out)
+
+def plot_basemap(region='Global', axis=None):
+    # use curret axis if not specified
+    if axis is None:
+        axis = plt.gca()
+    # plot map
+    if region == 'Global':
+        # global map
+        lon_ll = 20.0
+        lat_ll = -80.0
+        lon_ur = 380.0
+        lat_ur = 80.0
+        m = Basemap(projection='cyl', llcrnrlat=lat_ll, urcrnrlat=lat_ur,
+                llcrnrlon=lon_ll, urcrnrlon=lon_ur, ax=axis)
+        # parallels and meridians
+        mdlat = 30.0
+        mdlon = 60.0
+    else:
+        # regional map
+        region_obj = region_latlon(region)
+        lon_ll, lat_ll, lon_ur, lat_ur = region_obj.lon_ll, region_obj.lat_ll, region_obj.lon_ur, region_obj.lat_ur
+        lon_c = 0.5*(lon_ll+lon_ur)
+        lat_c = 0.5*(lat_ll+lat_ur)
+        m = Basemap(projection='cass', llcrnrlon=lon_ll, llcrnrlat=lat_ll,
+                urcrnrlon=lon_ur, urcrnrlat=lat_ur, resolution='l', lon_0=lon_c, lat_0=lat_c, ax=axis)
+        # parallels and meridians
+        mdlat = 10.0
+        mdlon = 10.0
+    # plot coastlines, draw label meridians and parallels.
+    m.drawcoastlines(zorder=3)
+    m.drawmapboundary(fill_color='lightgray')
+    m.fillcontinents(color='gray',lake_color='lightgray', zorder=2)
+    m.drawparallels(np.arange(-90.,91.,mdlat), labels=[1,0,0,1])
+    m.drawmeridians(np.arange(-180.,181.,mdlon), labels=[1,0,0,1])
+    return m
 
 def plot_transect_normal(mpaso_data_x, mpaso_data_y, transect, name='Normal Component', **kwargs):
     # cross section of zonal and meridional component
