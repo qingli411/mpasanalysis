@@ -362,7 +362,7 @@ class MPASOData(object):
             name = ncdata.long_name
         if units is None:
             units = ncdata.units
-        out = MPASOMap(data=ncdata[tidx,:], mesh=self, name=name, units=units)
+        out = MPASOMap(data=ncdata[tidx,:], mesh=self.mesh, name=name, units=units)
         return out
 
     def get_transport(self, transect=None, path=None, varname=None, varname_prefix='', bolus=False):
@@ -852,7 +852,7 @@ class MPASOMap(object):
             cb.update_ticks()
         return m, fig
 
-    def overlay(self, m, axis=None, **kwargs):
+    def overlay(self, m, axis=None, label=False, label_fmt='%1.2f', **kwargs):
         """Overlay contours on a map.
 
         :m: (Basemap) map
@@ -867,6 +867,8 @@ class MPASOMap(object):
         lon = self.lon
         x, y = m(lon, lat)
         fig = axis.tricontour(x, y, data, **kwargs)
+        if label:
+            axis.clabel(fig, fig.levels, fmt=label_fmt)
 
 #--------------------------------
 # MPASOVertCrossSection
@@ -902,7 +904,7 @@ class MPASOVertCrossSection(object):
         self.name = name
         self.units = units
 
-    def plot(self, axis=None, ptype='contourf', depth_mode='linear', levels=None, add_title=True, add_colorbar=True, cmap='rainbow', **kwargs):
+    def plot(self, axis=None, ptype='contourf', depth_mode='linear', levels=None, add_title=True, add_colorbar=True, invert_yaxis=True, cmap='rainbow', **kwargs):
         """Plot scatters on a map
 
         :axis: (matplotlib.axes, optional) axis to plot figure on
@@ -942,6 +944,10 @@ class MPASOVertCrossSection(object):
         elif ptype == 'contourf':
             fig = axis.contourf(self.dist, depth, np.transpose(self.data), levels=levels, extend='both',
                     norm=norm, cmap=plt.cm.get_cmap(cmap), **kwargs)
+        elif ptype == 'contour':
+            fig = axis.contour(self.dist, depth, np.transpose(self.data), levels=levels,
+                    norm=norm, **kwargs)
+            axis.clabel(fig, fig.levels, fmt='%1.2f')
         else:
             raise ValueError('Plot type {} not supported.'.format(ptype))
         # update depth scale
@@ -962,7 +968,8 @@ class MPASOVertCrossSection(object):
             axis.set_yticks(ticks_new)
         axis.set_xlabel('Distance (km)')
         axis.set_ylabel('Depth (m)')
-        axis.invert_yaxis()
+        if invert_yaxis:
+            axis.invert_yaxis()
         # add title
         if add_title:
             axis.set_title('{} ({})'.format(self.name, self.units))
@@ -972,6 +979,15 @@ class MPASOVertCrossSection(object):
             cb.formatter.set_powerlimits((-4, 4))
             cb.update_ticks()
         return fig
+
+#--------------------------------
+# MPASCICEData
+#--------------------------------
+
+class MPASCICEData(MPASOData):
+
+    """MPASCICEData object"""
+    pass
 
 #--------------------------------
 # MPASCICEMap
