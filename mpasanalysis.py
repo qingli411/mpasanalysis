@@ -330,7 +330,7 @@ class MPASOData(object):
         out = Dataset(self.filepath, 'r')
         return out
 
-    def get_volume(self, varname, name=None, units=None):
+    def get_volume(self, varname, name=None, units=None, tidx=0):
         """Get volume for variable
 
         :varname: (str) variable name
@@ -344,10 +344,10 @@ class MPASOData(object):
             name = ncdata.long_name
         if units is None:
             units = ncdata.units
-        out = MPASOVolume(data=ncdata[:], mesh=self.mesh, name=name, units=units)
+        out = MPASOVolume(data=ncdata[tidx,:,:], mesh=self.mesh, name=name, units=units)
         return out
 
-    def get_map(self, varname, name=None, units=None):
+    def get_map(self, varname, name=None, units=None, tidx=0):
         """Get map for variable
 
         :varname: (str) variable name
@@ -362,7 +362,7 @@ class MPASOData(object):
             name = ncdata.long_name
         if units is None:
             units = ncdata.units
-        out = MPASOMap(data=ncdata[:], mesh=self, name=name, units=units)
+        out = MPASOMap(data=ncdata[tidx,:], mesh=self, name=name, units=units)
         return out
 
     def get_transport(self, transect=None, path=None, varname=None, varname_prefix='', bolus=False):
