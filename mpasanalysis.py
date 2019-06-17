@@ -134,10 +134,10 @@ class MPASMesh(object):
             vertex_arr = verticesOnEdge[idx_edge_next,:]
             if vertex_arr[0] == indexToVertexID[idx_vertex_now]:
                 vertex_next = vertex_arr[1]
-                sign_edges.append(1)
+                sign_edges.append(-1)
             else:
                 vertex_next = vertex_arr[0]
-                sign_edges.append(-1)
+                sign_edges.append(1)
             idx_vertex_next = vertex_next-1
             # record vortices on path and the indices
             idx_vertices_on_path.append(idx_vertex_next)
