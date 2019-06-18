@@ -72,12 +72,12 @@ def load_paths_ocn(climo_ys=41, climo_ye=50, ts_ys=1, ts_ye=50, runname=None):
             rst_root = data_root+'/run'
             mon_root = data_root+'/run'
         elif runname == 'low-res-cmp':
-            data_root = '/lcrc/group/acme/jwolfe/acme_scratch/20190509.A_WCYCL1950S_CMIP6_LRtunedHR.ne30_oECv3_ICG.anvil'
+            data_root = '/lcrc/group/acme/jwolfe/archive/20190509.A_WCYCL1950S_CMIP6_LRtunedHR.ne30_oECv3_ICG.anvil'
             climo_root = '/lcrc/group/acme/qingli/e3sm_climo/20190509.A_WCYCL1950S_CMIP6_LRtunedHR.ne30_oECv3_ICG.anvil/{:04d}-{:04d}/ocn'.format(climo_ys+yshift, climo_ye+yshift)
             ts_root = '/lcrc/group/acme/qingli/e3sm_ts/20190509.A_WCYCL1950S_CMIP6_LRtunedHR.ne30_oECv3_ICG.anvil/{:04d}-{:04d}/ocn'.format(ts_ys+yshift, ts_ye+yshift)
             fig_root = os.environ['HOME']+'/work/e3sm_res_cmp/figures/low-res-cmp/{:04d}-{:04d}'.format(climo_ys+yshift, climo_ye+yshift)
-            rst_root = data_root+'/run'
-            mon_root = data_root+'/run'
+            rst_root = data_root+'/rest/{:04d}-01-01-00000'.format(climo_ye+yshift+1)
+            mon_root = data_root+'/ocn/hist'
         else:
             raise ValueError('Run \'{}\' not supported'.format(runname))
     elif 'pn1803144' in hostname:
@@ -183,12 +183,12 @@ def load_paths_ice(climo_ys=41, climo_ye=50, ts_ys=1, ts_ye=50, runname=None):
             rst_root = data_root+'/run'
             mon_root = data_root+'/run'
         elif runname == 'low-res-cmp':
-            data_root = '/lcrc/group/acme/jwolfe/acme_scratch/20190509.A_WCYCL1950S_CMIP6_LRtunedHR.ne30_oECv3_ICG.anvil'
+            data_root = '/lcrc/group/acme/jwolfe/archive/20190509.A_WCYCL1950S_CMIP6_LRtunedHR.ne30_oECv3_ICG.anvil'
             climo_root = '/lcrc/group/acme/qingli/e3sm_climo/20190509.A_WCYCL1950S_CMIP6_LRtunedHR.ne30_oECv3_ICG.anvil/{:04d}-{:04d}/ice'.format(climo_ys+yshift, climo_ye+yshift)
             ts_root = '/lcrc/group/acme/qingli/e3sm_ts/20190509.A_WCYCL1950S_CMIP6_LRtunedHR.ne30_oECv3_ICG.anvil/{:04d}-{:04d}/ice'.format(ts_ys+yshift, ts_ye+yshift)
             fig_root = os.environ['HOME']+'/work/e3sm_res_cmp/figures/low-res-cmp/{:04d}-{:04d}'.format(climo_ys+yshift, climo_ye+yshift)
-            rst_root = data_root+'/run'
-            mon_root = data_root+'/run'
+            rst_root = data_root+'/rest/{:04d}-01-01-00000'.format(climo_ye+yshift+1)
+            mon_root = data_root+'/ice/hist'
         else:
             raise ValueError('Run \'{}\' not supported'.format(runname))
     elif 'pn1803144' in hostname:
