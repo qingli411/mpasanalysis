@@ -29,6 +29,60 @@ class MPASMesh(object):
         out = Dataset(self.filepath, 'r')
         return out
 
+    def get_edge_sign_on_cell(self, mask=None):
+        """ Get the sign of edges on cells
+
+        :mask: (numpy array) mask
+        :return: (numpy array) sign of edges
+
+        """
+        fmesh = self.load()
+        if mask is None:
+            edgesOnCell = fmesh.variables['edgesOnCell'][:]
+            nEdgesOnCell = fmesh.variables['nEdgesOnCell'][:]
+            indexToCellID = fmesh.variables['indexToCellID'][:]
+        else:
+            edgesOnCell = fmesh.variables['edgesOnCell'][mask,:]
+            nEdgesOnCell = fmesh.variables['nEdgesOnCell'][mask]
+            indexToCellID = fmesh.variables['indexToCellID'][mask]
+        cellsOnEdge = fmesh.variables['cellsOnEdge'][:]
+        ncell, nec = edgesOnCell.shape
+        edge_sign_on_cell = np.zeros([ncell,nec])
+        for i, in np.arange(ncell):
+            for j in np.arange(nEdgesOnCell[i]):
+                idx_e = edgesOnCell[i,j]-1
+                if indexToCellID[i] == cellsOnEdge[idx_e, 0]:
+                    edge_sign_on_cell[i,j] = -1
+                else:
+                    edge_sign_on_cell[i,j] = 1
+        return edge_sign_on_cell
+
+    def get_edge_sign_on_vertex(self, mask=None):
+        """ Get the sign of edges on vertices
+
+        :mask: (numpy array) mask
+        :return: (numpy array) sign of edges
+
+        """
+        fmesh = self.load()
+        if mask is None:
+            edgesOnVertex = fmesh.variables['edgesOnVertex'][:]
+            indexToVertexID = fmesh.variables['indexToVertexID'][:]
+        else:
+            edgesOnVertex = fmesh.variables['edgesOnVertex'][mask,:]
+            indexToVertexID = fmesh.variables['indexToVertexID'][mask]
+        verticesOnEdge = fmesh.variables['verticesOnEdge'][:]
+        nvertex, nev = edgesOnVertex.shape
+        edge_sign_on_vertex = np.zeros([nvertex, nev])
+        for i in np.arange(nvertex):
+            for j in np.arange(3):
+                idx_e = edgesOnVertex[i,j]-1
+                if indexToVertexID[i] == verticesOnEdge[idx_e, 0]:
+                    edge_sign_on_vertex[i,j] = -1
+                else:
+                    edge_sign_on_vertex[i,j] = 1
+        return edge_sign_on_vertex
+
     def get_shortest_path(self, lonP0, latP0, lonP1, latP1, npoint_ref=1, debug_info=False):
         """ Get the shorted path that connects two endpoints.
 
@@ -134,10 +188,10 @@ class MPASMesh(object):
             vertex_arr = verticesOnEdge[idx_edge_next,:]
             if vertex_arr[0] == indexToVertexID[idx_vertex_now]:
                 vertex_next = vertex_arr[1]
-                sign_edges.append(1)
+                sign_edges.append(-1)
             else:
                 vertex_next = vertex_arr[0]
-                sign_edges.append(-1)
+                sign_edges.append(1)
             idx_vertex_next = vertex_next-1
             # record vortices on path and the indices
             idx_vertices_on_path.append(idx_vertex_next)
@@ -197,10 +251,11 @@ class MPASMesh(object):
                         lat_vertex=lat_vertices)
         return out
 
-    def get_map(self, varname, name=None, units=None):
+    def get_map(self, varname, position='cell', name=None, units=None):
         """Get map for variable
 
         :varname: (str) variable name
+        :position: (str) data position on grid, 'cell' or 'vertex'
         :name: (str) name of variable, optional
         :units: (str) units of variable, optional
 
@@ -211,7 +266,7 @@ class MPASMesh(object):
             name = ncdata.long_name
         if units is None:
             units = ncdata.units
-        out = MPASOMap(data=ncdata[:], mesh=self, name=name, units=units)
+        out = MPASOMap(data=ncdata[:], mesh=self, position=position, name=name, units=units)
         return out
 
     def plot_edges(self, m, **kwargs):
@@ -347,7 +402,7 @@ class MPASOData(object):
         out = MPASOVolume(data=ncdata[tidx,:,:], mesh=self.mesh, name=name, units=units)
         return out
 
-    def get_map(self, varname, name=None, units=None, tidx=0):
+    def get_map(self, varname, position='cell', name=None, units=None, tidx=0):
         """Get map for variable
 
         :varname: (str) variable name
@@ -362,8 +417,42 @@ class MPASOData(object):
             name = ncdata.long_name
         if units is None:
             units = ncdata.units
-        out = MPASOMap(data=ncdata[tidx,:], mesh=self.mesh, name=name, units=units)
+        out = MPASOMap(data=ncdata[tidx,:], mesh=self.mesh, position=position, name=name, units=units)
         return out
+
+    def get_map_relative_vorticity(self, depth=0.0, mask=None, varname_prefix=''):
+        """Get map of relative vorticity
+
+        """
+        fdata = self.load()
+        fmesh = self.mesh.load()
+        data = fdata.variables[varname_prefix+'normalVelocity'][:]
+        dcEdge = fmesh.variables['dcEdge'][:]
+        verticesOnEdge = fmesh.variables['verticesOnEdge'][:]
+        if mask is None:
+            edgesOnVertex = fmesh.variables['edgesOnVertex'][:]
+            areaTriangle = fmesh.variables['areaTriangle'][:]
+        else:
+            edgesOnVertex = fmesh.variables['edgesOnVertex'][mask,:]
+            areaTriangle = fmesh.variables['areaTriangle'][mask]
+        edgeSignOnVertex = self.mesh.get_edge_sign_on_vertex(mask=mask)
+        nt, ne, nz = data.shape
+        refbottomdepth = fmesh.variables['refBottomDepth'][:]
+        nvertlevels = len(refbottomdepth)
+        reftopdepth = np.zeros(nvertlevels)
+        reftopdepth[1:nvertlevels] = refbottomdepth[0:nvertlevels-1]
+        refmiddepth = 0.5*(reftopdepth+refbottomdepth)
+        zidx = np.argmin(np.abs(refmiddepth-depth))
+        normal_velocity = data[:,:,zidx]
+        nv = edgesOnVertex.shape[0]
+        vorticity = np.zeros([nt, nv])
+        for i in np.arange(nt):
+            for idx_v in np.arange(nv):
+                idx_ev = edgesOnVertex[idx_v,:]-1
+                vorticity[i,idx_v] = np.sum(normal_velocity[i,idx_ev] * dcEdge[idx_ev] * edgeSignOnVertex[idx_v,:])
+                vorticity[i,idx_v] = vorticity[i,idx_v]/areaTriangle[idx_v]
+        return vorticity
+
 
     def get_transport(self, transect=None, path=None, varname=None, varname_prefix='', bolus=False):
         """Compute the transport of variable across transect
@@ -443,7 +532,7 @@ class MPASOVolume(object):
     """MPASOVolume object"""
 
     def __init__(self, data=None, lon=None, lat=None, depth=None, cellarea=None, \
-                 layerthickness=None, bottomdepth=None, name=None, units=None, mesh=None):
+                 layerthickness=None, bottomdepth=None, position='cell', name=None, units=None, mesh=None):
         """Iniitalize MPASOVolume
 
         :data: (1D numpy array) data at each location
@@ -453,6 +542,7 @@ class MPASOVolume(object):
         :cellarea: (1D numpy array) area of cells
         :layerthickness: (1D numpy array) layer thickness
         :bottomdepth: (1D numpy array) depth of bottom
+        :position: (str) data position on grid, 'cell' or 'vertex'
         :name: (str) name of variable
         :units: (str) units of variable
         :mesh: (MPASMesh) mesh object
@@ -464,6 +554,7 @@ class MPASOVolume(object):
         self.name = name
         self.units = units
         self.mesh = mesh
+        self.position = position
         if mesh is None:
             assert lon is not None, 'Longitude array \'lon\' required.'
             assert lat is not None, 'Latitude array \'lat\' required.'
@@ -504,7 +595,7 @@ class MPASOVolume(object):
         zidx = np.argmin(np.abs(self.depth-depth))
         # MPASOMap object
         name = self.name+' at {:6.2f} m'.format(self.depth[zidx])
-        obj = MPASOMap(data=self.data[:,zidx], lon=self.lon, lat=self.lat, cellarea=self.cellarea, name=name, units=self.units)
+        obj = MPASOMap(data=self.data[:,zidx], mesh=self.mesh, lon=self.lon, lat=self.lat, cellarea=self.cellarea, position=self.position, name=name, units=self.units)
         return obj
 
     def get_map_vertical_sum(self, depth_bottom=6000.0, depth_top=0.0):
@@ -523,7 +614,7 @@ class MPASOVolume(object):
         # MPASOMap object
         name = 'Vertical sum of '+self.name+' between {:6.2f} m and {:6.2f} m'.format(z_top, z_bottom)
         units = self.units+' m'
-        obj = MPASOMap(data=data, lon=self.lon, lat=self.lat, cellarea=self.cellarea, name=name, units=units)
+        obj = MPASOMap(data=data, mesh=self.mesh, lon=self.lon, lat=self.lat, cellarea=self.cellarea, position=self.position, name=name, units=units)
         return obj
 
     def get_map_vertical_mean(self, depth_bottom=6000.0, depth_top=0.0):
@@ -544,7 +635,7 @@ class MPASOVolume(object):
         # MPASOMap object
         name = 'Vertical mean of '+self.name+' between {:6.2f} m and {:6.2f} m'.format(z_top, z_bottom)
         units = self.units
-        obj = MPASOMap(data=data, lon=self.lon, lat=self.lat, cellarea=self.cellarea, name=name, units=units)
+        obj = MPASOMap(data=data, mesh=self.mesh, lon=self.lon, lat=self.lat, cellarea=self.cellarea, position=self.position, name=name, units=units)
         return obj
 
     def get_vertical_cross_section(self, lon0, lat0, lon1, lat1, depth_bottom=6000.0, depth_top=0.0):
@@ -608,13 +699,14 @@ class MPASOMap(object):
 
     """MPASOMap object"""
 
-    def __init__(self, data=None, lon=None, lat=None, cellarea=None, name=None, units=None, mesh=None):
+    def __init__(self, data=None, lon=None, lat=None, cellarea=None, position='cell', name=None, units=None, mesh=None):
         """Initialize MPASOMap
 
         :data: (1D numpy array) data at each location
         :lon: (1D numpy array) longitude
         :lat: (1D numpy array) latitude
         :cellarea: (1D numpy array) area of cells
+        :position: (str) data position on grid, 'cell' or 'vertex'
         :name: (str) name of variable
         :units: (str) units of variable
         :mesh: (MPASMesh) mesh object
@@ -626,6 +718,7 @@ class MPASOMap(object):
             self.name = name
             self.units = units
             self.mesh = mesh
+            self.position = position
             if mesh is None:
                 assert lon is not None, 'Longitude array \'lon\' required.'
                 assert lat is not None, 'Latitude array \'lat\' required.'
@@ -636,9 +729,16 @@ class MPASOMap(object):
             else:
                 print("Reading mesh data from {}".format(mesh.filepath))
                 fmesh = mesh.load()
-                self.lon = np.degrees(fmesh.variables['lonCell'][:])
-                self.lat = np.degrees(fmesh.variables['latCell'][:])
-                self.cellarea = fmesh.variables['areaCell'][:]
+                if position == 'cell':
+                    self.lon = np.degrees(fmesh.variables['lonCell'][:])
+                    self.lat = np.degrees(fmesh.variables['latCell'][:])
+                    self.cellarea = fmesh.variables['areaCell'][:]
+                elif position == 'vertex':
+                    self.lon = np.degrees(fmesh.variables['lonVertex'][:])
+                    self.lat = np.degrees(fmesh.variables['latVertex'][:])
+                    self.cellarea = fmesh.variables['areaTriangle'][:]
+                else:
+                    raise ValueError('Unsupported position \'{}\''.format(position))
 
     def save(self, filepath):
         """Save MPASOMap object
@@ -712,34 +812,59 @@ class MPASOMap(object):
             mean = np.sum(data*cellarea)/np.sum(cellarea)
         return mean
 
-    def _pcolor(self, m, **kwargs):
+    def _pcolor(self, m, position='cell', **kwargs):
         assert self.mesh is not None, 'Mesh file required for pcolor.'
         fmesh = self.mesh.load()
         lonCell         = np.degrees(fmesh.variables['lonCell'][:])
         latCell         = np.degrees(fmesh.variables['latCell'][:])
         lonVertex       = np.degrees(fmesh.variables['lonVertex'][:])
         latVertex       = np.degrees(fmesh.variables['latVertex'][:])
-        verticesOnCell  = fmesh.variables['verticesOnCell'][:]
-        nEdgesOnCell    = fmesh.variables['nEdgesOnCell'][:]
-        # subset
+        # bounds of the domain
         lonmax = np.mod(m.lonmax, 360)
         lonmin = np.mod(m.lonmin, 360)
         latmax = m.latmax
         latmin = m.latmin
-        idx = (lonCell <= lonmax) & (lonCell >= lonmin) & \
-              (latCell <= latmax) & (latCell >= latmin)
-        verticesOnCell_arr = verticesOnCell[idx,:]
-        nEdgesOnCell_arr = nEdgesOnCell[idx]
-        data = self.data[idx]
-        # patches
-        patches = []
-        ncell=verticesOnCell_arr.shape[0]
-        for i in np.arange(ncell):
-            idx_v = verticesOnCell_arr[i,:nEdgesOnCell_arr[i]]-1
-            lonp = lonVertex[idx_v]
-            latp = latVertex[idx_v]
-            xp, yp = m(lonp, latp)
-            patches.append(Polygon(list(zip(xp,yp))))
+        if position == 'cell':
+            verticesOnCell  = fmesh.variables['verticesOnCell'][:]
+            nEdgesOnCell    = fmesh.variables['nEdgesOnCell'][:]
+            idx = (lonCell <= lonmax) & (lonCell >= lonmin) & \
+                  (latCell <= latmax) & (latCell >= latmin)
+            verticesOnCell_arr = verticesOnCell[idx,:]
+            nEdgesOnCell_arr = nEdgesOnCell[idx]
+            data = self.data[idx]
+            # patches
+            patches = []
+            ncell = verticesOnCell_arr.shape[0]
+            for i in np.arange(ncell):
+                idx_v = verticesOnCell_arr[i,:nEdgesOnCell_arr[i]]-1
+                lonp = lonVertex[idx_v]
+                latp = latVertex[idx_v]
+                xp, yp = m(lonp, latp)
+                patches.append(Polygon(list(zip(xp,yp))))
+        elif position == 'vertex':
+            cellsOnVertex = fmesh.variables['cellsOnVertex'][:]
+            nEdgesOnCell    = fmesh.variables['nEdgesOnCell'][:]
+            idx = (lonVertex <= lonmax) & (lonVertex >= lonmin) & \
+                  (latVertex <= latmax) & (latVertex >= latmin)
+            cellsOnVertex_arr = cellsOnVertex[idx,:]
+            data = self.data[idx]
+            # patches
+            patches = []
+            idx_mask = []
+            nvertex = cellsOnVertex_arr.shape[0]
+            for i in np.arange(nvertex):
+                idx_c = cellsOnVertex_arr[i,:]-1
+                if any(idx_c == -1):
+                    idx_mask.append(i)
+                    continue
+                lonp = lonCell[idx_c]
+                latp = latCell[idx_c]
+                xp, yp = m(lonp, latp)
+                patches.append(Polygon(list(zip(xp,yp))))
+            data = np.delete(data, idx_mask)
+        else:
+            raise ValueError('Unsupported position \'{}\''.format(position))
+        # plot patch collection
         pc = PatchCollection(patches, **kwargs)
         pc.set_array(data)
         pc.set_lw(0.1)
@@ -830,7 +955,7 @@ class MPASOMap(object):
             fig = m.contourf(x, y, data, tri=True, levels=levels, extend='both',
                         norm=norm, cmap=plt.cm.get_cmap(cmap), **kwargs)
         elif ptype == 'pcolor':
-            fig = self._pcolor(m, norm=norm, cmap=plt.cm.get_cmap(cmap), alpha=1.0, **kwargs)
+            fig = self._pcolor(m, position=self.position, norm=norm, cmap=plt.cm.get_cmap(cmap), alpha=1.0, **kwargs)
         else:
             raise ValueError('Plot type {} not supported.'.format(ptype))
         # add label
