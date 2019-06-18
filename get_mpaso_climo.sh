@@ -30,6 +30,14 @@ case ${varname} in
         varlist="timeMonthly_avg_activeTracers_salinity"
         component="ocn"
         ;;
+    "salinityTendency" )
+        varlist="timeMonthly_avg_activeTracerHorizontalAdvectionTendency_salinityHorizontalAdvectionTendency,timeMonthly_avg_activeTracerVerticalAdvectionTendency_salinityVerticalAdvectionTendency,timeMonthly_avg_activeTracerVertMixTendency_salinityVertMixTendency,timeMonthly_avg_activeTracerSurfaceFluxTendency_salinitySurfaceFluxTendency,timeMonthly_avg_activeTracerNonLocalTendency_salinityNonLocalTendency"
+        component="ocn"
+        ;;
+    "temperatureTendency" )
+        varlist="timeMonthly_avg_activeTracerHorizontalAdvectionTendency_temperatureHorizontalAdvectionTendency,timeMonthly_avg_activeTracerVerticalAdvectionTendency_temperatureVerticalAdvectionTendency,timeMonthly_avg_activeTracerVertMixTendency_temperatureVertMixTendency,timeMonthly_avg_activeTracerSurfaceFluxTendency_temperatureSurfaceFluxTendency,timeMonthly_avg_activeTracerNonLocalTendency_temperatureNonLocalTendency,timeMonthly_avg_temperatureShortWaveTendency"
+        component="ocn"
+        ;;
     "potentialDensity" )
         varlist="timeMonthly_avg_potentialDensity"
         component="ocn"
@@ -66,9 +74,10 @@ case "${HOSTNAME}" in
     blueslogin* )
         # caseid=20190212.A_WCYCL1950S_CMIP6_LRtunedHR-noCNT.ne30_oECv3_ICG.anvil
         # caseid=20190419.test.A_WCYCL1850.ne30_oGNLD30to10.anvil
-        # drc_in=/lcrc/group/acme/jwolfe/acme_scratch/anvil/${caseid}/run
-        caseid=20190509.A_WCYCL1950S_CMIP6_LRtunedHR.ne30_oECv3_ICG.anvil
-        drc_in=/lcrc/group/acme/jwolfe/acme_scratch/${caseid}/run
+        # caseid=20190509.A_WCYCL1950S_CMIP6_LRtunedHR.ne30_oECv3_ICG.anvil
+        # drc_in=/lcrc/group/acme/jwolfe/archive/${caseid}/${component}/hist
+        caseid=20190523.GM1800.A_WCYCL1850.ne30_oGNLD30to10.anvil
+        drc_in=/lcrc/group/acme/jwolfe/acme_scratch/anvil/${caseid}/run
         drc_out=/lcrc/group/acme/qingli/e3sm_climo
         e3sm_config=/lcrc/soft/climate/e3sm-unified/load_latest_e3sm_unified_x.sh
         ;;
