@@ -21,6 +21,7 @@ def load_paths_ocn(climo_ys=41, climo_ye=50, ts_ys=1, ts_ye=50, runname=None):
     if 'theta' in hostname:
         yshift = 0
         data_root = '/projects/ClimateEnergy_3/azamatm/E3SM_simulations/theta.20180906.branch_noCNT.A_WCYCL1950S_CMIP6_HR.ne120_oRRS18v3_ICG'
+        # data_root = '/home/qingli/work/e3sm_res_cmp/theta.20180906.branch_noCNT.A_WCYCL1950S_CMIP6_HR.ne120_oRRS18v3_ICG'
         climo_root = '/lus/theta-fs0/projects/ClimateEnergy_3/qingli/e3sm_climo/theta.20180906.branch_noCNT.A_WCYCL1950S_CMIP6_HR.ne120_oRRS18v3_ICG/{:04d}-{:04d}/ocn'.format(climo_ys+yshift, climo_ye+yshift)
         ts_root = '/lus/theta-fs0/projects/ClimateEnergy_3/qingli/e3sm_ts/theta.20180906.branch_noCNT.A_WCYCL1950S_CMIP6_HR.ne120_oRRS18v3_ICG/{:04d}-{:04d}/ocn'.format(ts_ys+yshift, ts_ye+yshift)
         fig_root = os.environ['HOME']+'/work/e3sm_res_cmp/figures/high_res/{:04d}-{:04d}'.format(climo_ys+yshift, climo_ye+yshift)
