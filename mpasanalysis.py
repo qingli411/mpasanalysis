@@ -29,6 +29,60 @@ class MPASMesh(object):
         out = Dataset(self.filepath, 'r')
         return out
 
+    def get_edge_sign_on_cell(self, mask=None):
+        """ Get the sign of edges on cells
+
+        :mask: (numpy array) mask
+        :return: (numpy array) sign of edges
+
+        """
+        fmesh = self.load()
+        if mask is None:
+            edgesOnCell = fmesh.variables['edgesOnCell'][:]
+            nEdgesOnCell = fmesh.variables['nEdgesOnCell'][:]
+            indexToCellID = fmesh.variables['indexToCellID'][:]
+        else:
+            edgesOnCell = fmesh.variables['edgesOnCell'][mask,:]
+            nEdgesOnCell = fmesh.variables['nEdgesOnCell'][mask]
+            indexToCellID = fmesh.variables['indexToCellID'][mask]
+        cellsOnEdge = fmesh.variables['cellsOnEdge'][:]
+        ncell, nec = edgesOnCell.shape
+        edge_sign_on_cell = np.zeros([ncell,nec])
+        for i, in np.arange(ncell):
+            for j in np.arange(nEdgesOnCell[i]):
+                idx_e = edgesOnCell[i,j]-1
+                if indexToCellID[i] == cellsOnEdge[idx_e, 0]:
+                    edge_sign_on_cell[i,j] = -1
+                else:
+                    edge_sign_on_cell[i,j] = 1
+        return edge_sign_on_cell
+
+    def get_edge_sign_on_vertex(self, mask=None):
+        """ Get the sign of edges on vertices
+
+        :mask: (numpy array) mask
+        :return: (numpy array) sign of edges
+
+        """
+        fmesh = self.load()
+        if mask is None:
+            edgesOnVertex = fmesh.variables['edgesOnVertex'][:]
+            indexToVertexID = fmesh.variables['indexToVertexID'][:]
+        else:
+            edgesOnVertex = fmesh.variables['edgesOnVertex'][mask,:]
+            indexToVertexID = fmesh.variables['indexToVertexID'][mask]
+        verticesOnEdge = fmesh.variables['verticesOnEdge'][:]
+        nvertex, nev = edgesOnVertex.shape
+        edge_sign_on_vertex = np.zeros([nvertex, nev])
+        for i in np.arange(nvertex):
+            for j in np.arange(3):
+                idx_e = edgesOnVertex[i,j]-1
+                if indexToVertexID[i] == verticesOnEdge[idx_e, 0]:
+                    edge_sign_on_vertex[i,j] = -1
+                else:
+                    edge_sign_on_vertex[i,j] = 1
+        return edge_sign_on_vertex
+
     def get_shortest_path(self, lonP0, latP0, lonP1, latP1, npoint_ref=1, debug_info=False):
         """ Get the shorted path that connects two endpoints.
 
@@ -365,6 +419,40 @@ class MPASOData(object):
             units = ncdata.units
         out = MPASOMap(data=ncdata[tidx,:], mesh=self.mesh, position=position, name=name, units=units)
         return out
+
+    def get_map_relative_vorticity(self, depth=0.0, mask=None, varname_prefix=''):
+        """Get map of relative vorticity
+
+        """
+        fdata = self.load()
+        fmesh = self.mesh.load()
+        data = fdata.variables[varname_prefix+'normalVelocity'][:]
+        dcEdge = fmesh.variables['dcEdge'][:]
+        verticesOnEdge = fmesh.variables['verticesOnEdge'][:]
+        if mask is None:
+            edgesOnVertex = fmesh.variables['edgesOnVertex'][:]
+            areaTriangle = fmesh.variables['areaTriangle'][:]
+        else:
+            edgesOnVertex = fmesh.variables['edgesOnVertex'][mask,:]
+            areaTriangle = fmesh.variables['areaTriangle'][mask]
+        edgeSignOnVertex = self.mesh.get_edge_sign_on_vertex(mask=mask)
+        nt, ne, nz = data.shape
+        refbottomdepth = fmesh.variables['refBottomDepth'][:]
+        nvertlevels = len(refbottomdepth)
+        reftopdepth = np.zeros(nvertlevels)
+        reftopdepth[1:nvertlevels] = refbottomdepth[0:nvertlevels-1]
+        refmiddepth = 0.5*(reftopdepth+refbottomdepth)
+        zidx = np.argmin(np.abs(refmiddepth-depth))
+        normal_velocity = data[:,:,zidx]
+        nv = edgesOnVertex.shape[0]
+        vorticity = np.zeros([nt, nv])
+        for i in np.arange(nt):
+            for idx_v in np.arange(nv):
+                idx_ev = edgesOnVertex[idx_v,:]-1
+                vorticity[i,idx_v] = np.sum(normal_velocity[i,idx_ev] * dcEdge[idx_ev] * edgeSignOnVertex[idx_v,:])
+                vorticity[i,idx_v] = vorticity[i,idx_v]/areaTriangle[idx_v]
+        return vorticity
+
 
     def get_transport(self, transect=None, path=None, varname=None, varname_prefix='', bolus=False):
         """Compute the transport of variable across transect
