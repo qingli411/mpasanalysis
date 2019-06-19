@@ -828,7 +828,8 @@ class MPASOMap(object):
             verticesOnCell  = fmesh.variables['verticesOnCell'][:]
             nEdgesOnCell    = fmesh.variables['nEdgesOnCell'][:]
             idx = (lonCell <= lonmax) & (lonCell >= lonmin) & \
-                  (latCell <= latmax) & (latCell >= latmin)
+                  (latCell <= latmax) & (latCell >= latmin) & \
+                  (~ np.isnan(self.data))
             verticesOnCell_arr = verticesOnCell[idx,:]
             nEdgesOnCell_arr = nEdgesOnCell[idx]
             data = self.data[idx]
@@ -845,7 +846,8 @@ class MPASOMap(object):
             cellsOnVertex = fmesh.variables['cellsOnVertex'][:]
             nEdgesOnCell    = fmesh.variables['nEdgesOnCell'][:]
             idx = (lonVertex <= lonmax) & (lonVertex >= lonmin) & \
-                  (latVertex <= latmax) & (latVertex >= latmin)
+                  (latVertex <= latmax) & (latVertex >= latmin) & \
+                  (~ np.isnan(self.data))
             cellsOnVertex_arr = cellsOnVertex[idx,:]
             data = self.data[idx]
             # patches
@@ -867,6 +869,66 @@ class MPASOMap(object):
         # plot patch collection
         pc = PatchCollection(patches, **kwargs)
         pc.set_array(data)
+        pc.set_lw(0.1)
+        out = m.ax.add_collection(pc)
+        return out
+
+    def _pcolor_nan_mask(self, m, position='cell'):
+        assert self.mesh is not None, 'Mesh file required for pcolor.'
+        fmesh = self.mesh.load()
+        lonCell         = np.degrees(fmesh.variables['lonCell'][:])
+        latCell         = np.degrees(fmesh.variables['latCell'][:])
+        lonVertex       = np.degrees(fmesh.variables['lonVertex'][:])
+        latVertex       = np.degrees(fmesh.variables['latVertex'][:])
+        # bounds of the domain
+        lonmax = np.mod(m.lonmax, 360)
+        lonmin = np.mod(m.lonmin, 360)
+        latmax = m.latmax
+        latmin = m.latmin
+        if position == 'cell':
+            verticesOnCell  = fmesh.variables['verticesOnCell'][:]
+            nEdgesOnCell    = fmesh.variables['nEdgesOnCell'][:]
+            idx = (lonCell <= lonmax) & (lonCell >= lonmin) & \
+                  (latCell <= latmax) & (latCell >= latmin) & \
+                  (np.isnan(self.data))
+            verticesOnCell_arr = verticesOnCell[idx,:]
+            nEdgesOnCell_arr = nEdgesOnCell[idx]
+            data = self.data[idx]
+            # patches
+            patches = []
+            ncell = verticesOnCell_arr.shape[0]
+            for i in np.arange(ncell):
+                idx_v = verticesOnCell_arr[i,:nEdgesOnCell_arr[i]]-1
+                lonp = lonVertex[idx_v]
+                latp = latVertex[idx_v]
+                xp, yp = m(lonp, latp)
+                patches.append(Polygon(list(zip(xp,yp))))
+        elif position == 'vertex':
+            cellsOnVertex = fmesh.variables['cellsOnVertex'][:]
+            nEdgesOnCell    = fmesh.variables['nEdgesOnCell'][:]
+            idx = (lonVertex <= lonmax) & (lonVertex >= lonmin) & \
+                  (latVertex <= latmax) & (latVertex >= latmin) & \
+                  (np.isnan(self.data))
+            cellsOnVertex_arr = cellsOnVertex[idx,:]
+            data = self.data[idx]
+            # patches
+            patches = []
+            idx_mask = []
+            nvertex = cellsOnVertex_arr.shape[0]
+            for i in np.arange(nvertex):
+                idx_c = cellsOnVertex_arr[i,:]-1
+                if any(idx_c == -1):
+                    idx_mask.append(i)
+                    continue
+                lonp = lonCell[idx_c]
+                latp = latCell[idx_c]
+                xp, yp = m(lonp, latp)
+                patches.append(Polygon(list(zip(xp,yp))))
+            data = np.delete(data, idx_mask)
+        else:
+            raise ValueError('Unsupported position \'{}\''.format(position))
+        # plot patch collection
+        pc = PatchCollection(patches, facecolors='lightgray', edgecolors='lightgray', alpha=1.0)
         pc.set_lw(0.1)
         out = m.ax.add_collection(pc)
         return out
@@ -893,15 +955,17 @@ class MPASOMap(object):
         # print message
         print('Plotting map of {} at region \'{}\''.format(self.name+' ('+self.units+')', region))
         m = plot_basemap(region=region, axis=axis)
+        # mask out nan
+        nan_mask = (~ np.isnan(self.data))
         # process data
         if region == 'Global':
             # markersize
             markersize = 1
             # data
-            data = self.data
-            lat = self.lat
-            lon = self.lon
-            cellarea = self.cellarea
+            data = self.data[nan_mask]
+            lat = self.lat[nan_mask]
+            lon = self.lon[nan_mask]
+            cellarea = self.cellarea[nan_mask]
             # shift longitude
             lon = np.where(lon < 20., lon+360., lon)
         else:
@@ -915,7 +979,7 @@ class MPASOMap(object):
             latmin = m.latmin
             lon_mask = (self.lon <= lonmax) & (self.lon >= lonmin)
             lat_mask = (self.lat <= latmax) & (self.lat >= latmin)
-            region_mask = lon_mask & lat_mask
+            region_mask = lon_mask & lat_mask & nan_mask
             # apply region mask to data
             data = self.data[region_mask]
             lat = self.lat[region_mask]
@@ -954,6 +1018,7 @@ class MPASOMap(object):
             x, y = m(lon, lat)
             fig = m.contourf(x, y, data, tri=True, levels=levels, extend='both',
                         norm=norm, cmap=plt.cm.get_cmap(cmap), **kwargs)
+            self._pcolor_nan_mask(m, position=self.position)
         elif ptype == 'pcolor':
             fig = self._pcolor(m, position=self.position, norm=norm, cmap=plt.cm.get_cmap(cmap), alpha=1.0, **kwargs)
         else:
