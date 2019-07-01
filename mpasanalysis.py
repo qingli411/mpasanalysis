@@ -748,7 +748,7 @@ class MPASOMap(object):
 
         """
         np.savez(filepath, data=self.data, lon=self.lon, lat=self.lat, cellarea=self.cellarea, \
-                 name=self.name, units=self.units, mesh=self.mesh)
+                 name=self.name, units=self.units, meshfile=self.mesh.filepath)
 
     def load(self, filepath):
         """Load data to MPASOMap object
@@ -758,8 +758,11 @@ class MPASOMap(object):
 
         """
         dat = np.load(filepath)
-        if 'mesh' not in dat.keys():
+        if 'meshfile' not in dat.keys():
             mesh = None
+        else:
+            meshfile = str(dat['meshfile'])
+            mesh = MPASMesh(filepath=meshfile)
         self.__init__(data=dat['data'], lon=dat['lon'], lat=dat['lat'], cellarea=dat['cellarea'], \
                       name=str(dat['name']), units=str(dat['units']), mesh=mesh)
         return self
@@ -813,7 +816,7 @@ class MPASOMap(object):
         return mean
 
     def _pcolor(self, m, position='cell', **kwargs):
-        assert self.mesh is not None, 'Mesh file required for pcolor.'
+        assert self.mesh is not None, 'Mesh file required for _pcolor.'
         fmesh = self.mesh.load()
         lonCell         = np.degrees(fmesh.variables['lonCell'][:])
         latCell         = np.degrees(fmesh.variables['latCell'][:])
@@ -874,7 +877,7 @@ class MPASOMap(object):
         return out
 
     def _pcolor_nan_mask(self, m, position='cell'):
-        assert self.mesh is not None, 'Mesh file required for pcolor.'
+        assert self.mesh is not None, 'Mesh file required for _pcolor_nan_mask.'
         fmesh = self.mesh.load()
         lonCell         = np.degrees(fmesh.variables['lonCell'][:])
         latCell         = np.degrees(fmesh.variables['latCell'][:])
@@ -933,7 +936,7 @@ class MPASOMap(object):
         out = m.ax.add_collection(pc)
         return out
 
-    def plot(self, axis=None, region='Global', ptype='scatter', levels=None,
+    def plot(self, axis=None, region='Global', ptype='contourf', mask_nan=False, levels=None,
              label=None, add_title=True, title=None, add_colorbar=True, cmap='rainbow', **kwargs):
         """Plot scatters on a map
 
@@ -1018,7 +1021,8 @@ class MPASOMap(object):
             x, y = m(lon, lat)
             fig = m.contourf(x, y, data, tri=True, levels=levels, extend='both',
                         norm=norm, cmap=plt.cm.get_cmap(cmap), **kwargs)
-            self._pcolor_nan_mask(m, position=self.position)
+            if mask_nan:
+                self._pcolor_nan_mask(m, position=self.position)
         elif ptype == 'pcolor':
             fig = self._pcolor(m, position=self.position, norm=norm, cmap=plt.cm.get_cmap(cmap), alpha=1.0, **kwargs)
         else:
