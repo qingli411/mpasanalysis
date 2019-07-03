@@ -4,7 +4,7 @@ import os
 # Functions for E3SM resolution comparsion
 #--------------------------------
 
-def load_paths_ocn(climo_ys=41, climo_ye=50, ts_ys=1, ts_ye=50, runname=None):
+def load_paths_ocn(climo_ys=None, climo_ye=None, ts_ys=None, ts_ye=None, rest_yr=None, runname=None):
     """Load paths of ocean data
     :climo_ys: starting year of climatology
     :climo_ye: ending year of climatology
@@ -17,6 +17,8 @@ def load_paths_ocn(climo_ys=41, climo_ye=50, ts_ys=1, ts_ye=50, runname=None):
     # get hostname
     hostname = os.uname()[1]
     print('Running on machine {}'.format(hostname))
+    if rest_yr is None:
+        rest_yr = ts_ye + 1
     # set paths
     if 'theta' in hostname:
         yshift = 0
@@ -77,7 +79,14 @@ def load_paths_ocn(climo_ys=41, climo_ye=50, ts_ys=1, ts_ye=50, runname=None):
             climo_root = '/lcrc/group/acme/qingli/e3sm_climo/20190509.A_WCYCL1950S_CMIP6_LRtunedHR.ne30_oECv3_ICG.anvil/{:04d}-{:04d}/ocn'.format(climo_ys+yshift, climo_ye+yshift)
             ts_root = '/lcrc/group/acme/qingli/e3sm_ts/20190509.A_WCYCL1950S_CMIP6_LRtunedHR.ne30_oECv3_ICG.anvil/{:04d}-{:04d}/ocn'.format(ts_ys+yshift, ts_ye+yshift)
             fig_root = os.environ['HOME']+'/work/e3sm_res_cmp/figures/low-res-cmp/{:04d}-{:04d}'.format(climo_ys+yshift, climo_ye+yshift)
-            rst_root = data_root+'/rest/{:04d}-01-01-00000'.format(climo_ye+yshift+1)
+            rst_root = data_root+'/rest/{:04d}-01-01-00000'.format(rest_yr+yshift)
+            mon_root = data_root+'/ocn/hist'
+        elif runname == 'conus01':
+            data_root = '/lcrc/group/acme/maltrud/archive/A_WCYC1850_ne30_oNAEC60to30cr8L60v1_anvil01'
+            climo_root = '/lcrc/group/acme/qingli/e3sm_climo/A_WCYC1850_ne30_oNAEC60to30cr8L60v1_anvil01/{:04d}-{:04d}/ocn'.format(climo_ys+yshift, climo_ye+yshift)
+            ts_root = '/lcrc/group/acme/qingli/e3sm_ts/A_WCYC1850_ne30_oNAEC60to30cr8L60v1_anvil01/{:04d}-{:04d}/ocn'.format(ts_ys+yshift, ts_ye+yshift)
+            fig_root = os.environ['HOME']+'/work/e3sm_res_cmp/figures/conus01/{:04d}-{:04d}'.format(climo_ys+yshift, climo_ye+yshift)
+            rst_root = data_root+'/rest/{:04d}-01-01-00000'.format(rest_yr+yshift)
             mon_root = data_root+'/ocn/hist'
         else:
             raise ValueError('Run \'{}\' not supported'.format(runname))
@@ -116,7 +125,7 @@ def load_paths_ocn(climo_ys=41, climo_ye=50, ts_ys=1, ts_ye=50, runname=None):
             'fig_root': fig_root}
     return path
 
-def load_paths_ice(climo_ys=41, climo_ye=50, ts_ys=1, ts_ye=50, runname=None):
+def load_paths_ice(climo_ys=None, climo_ye=None, ts_ys=None, ts_ye=None, rest_yr=None, runname=None):
     """Load paths of sea ice data
     :climo_ys: starting year of climatology
     :climo_ye: ending year of climatology
@@ -129,6 +138,8 @@ def load_paths_ice(climo_ys=41, climo_ye=50, ts_ys=1, ts_ye=50, runname=None):
     # get hostname
     hostname = os.uname()[1]
     print('Running on machine {}'.format(hostname))
+    if rest_yr is None:
+        rest_yr = ts_ye + 1
     # set paths
     if 'theta' in hostname:
         yshift = 0
@@ -188,7 +199,14 @@ def load_paths_ice(climo_ys=41, climo_ye=50, ts_ys=1, ts_ye=50, runname=None):
             climo_root = '/lcrc/group/acme/qingli/e3sm_climo/20190509.A_WCYCL1950S_CMIP6_LRtunedHR.ne30_oECv3_ICG.anvil/{:04d}-{:04d}/ice'.format(climo_ys+yshift, climo_ye+yshift)
             ts_root = '/lcrc/group/acme/qingli/e3sm_ts/20190509.A_WCYCL1950S_CMIP6_LRtunedHR.ne30_oECv3_ICG.anvil/{:04d}-{:04d}/ice'.format(ts_ys+yshift, ts_ye+yshift)
             fig_root = os.environ['HOME']+'/work/e3sm_res_cmp/figures/low-res-cmp/{:04d}-{:04d}'.format(climo_ys+yshift, climo_ye+yshift)
-            rst_root = data_root+'/rest/{:04d}-01-01-00000'.format(climo_ye+yshift+1)
+            rst_root = data_root+'/rest/{:04d}-01-01-00000'.format(rest_yr+yshift)
+            mon_root = data_root+'/ice/hist'
+        elif runname == 'conus01':
+            data_root = '/lcrc/group/acme/maltrud/archive/A_WCYC1850_ne30_oNAEC60to30cr8L60v1_anvil01'
+            climo_root = '/lcrc/group/acme/qingli/e3sm_climo/A_WCYC1850_ne30_oNAEC60to30cr8L60v1_anvil01/{:04d}-{:04d}/ice'.format(climo_ys+yshift, climo_ye+yshift)
+            ts_root = '/lcrc/group/acme/qingli/e3sm_ts/A_WCYC1850_ne30_oNAEC60to30cr8L60v1_anvil01/{:04d}-{:04d}/ice'.format(ts_ys+yshift, ts_ye+yshift)
+            fig_root = os.environ['HOME']+'/work/e3sm_res_cmp/figures/conus01/{:04d}-{:04d}'.format(climo_ys+yshift, climo_ye+yshift)
+            rst_root = data_root+'/rest/{:04d}-01-01-00000'.format(rest_yr+yshift)
             mon_root = data_root+'/ice/hist'
         else:
             raise ValueError('Run \'{}\' not supported'.format(runname))
