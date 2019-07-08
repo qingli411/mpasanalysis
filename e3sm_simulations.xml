@@ -1,0 +1,69 @@
+<?xml version="1.0"?>
+
+<data>
+    <simulation name="low-res-cmp">
+        <longname>20190509.A_WCYCL1950S_CMIP6_LRtunedHR.ne30_oECv3_ICG.anvil</longname>
+        <dataroot>/lcrc/group/acme/jwolfe/archive</dataroot>
+        <climoroot>/lcrc/group/acme/qingli</climoroot>
+        <roottype>archive</roottype>
+        <machine>blues</machine>
+    </simulation>
+
+    <simulation name="low-res-noSI">
+        <longname>20190212.A_WCYCL1950S_CMIP6_LRtunedHR-noCNT.ne30_oECv3_ICG.anvil</longname>
+        <dataroot>/lcrc/group/acme/jwolfe/acme_scratch/anvil</dataroot>
+        <climoroot>/lcrc/group/acme/qingli</climoroot>
+        <roottype>run</roottype>
+        <machine>blues</machine>
+    </simulation>
+
+    <simulation name="gl-mesh-gm1800">
+        <longname>20190523.GM1800.A_WCYCL1850.ne30_oGNLD30to10.anvil</longname>
+        <dataroot>/lcrc/group/acme/jwolfe/acme_scratch/anvil</dataroot>
+        <climoroot>/lcrc/group/acme/qingli</climoroot>
+        <roottype>run</roottype>
+        <machine>blues</machine>
+    </simulation>
+
+    <simulation name="conus01">
+        <longname>A_WCYC1850_ne30_oNAEC60to30cr8L60v1_anvil01</longname>
+        <dataroot>/lcrc/group/acme/maltrud/archive</dataroot>
+        <climoroot>/lcrc/group/acme/qingli</climoroot>
+        <roottype>archive</roottype>
+        <machine>blues</machine>
+    </simulation>
+
+    <simulation name="high-res-cmp">
+        <longname>theta.20180906.branch_noCNT.A_WCYCL1950S_CMIP6_HR.ne120_oRRS18v3_ICG</longname>
+        <!-- <dataroot>/projects/ClimateEnergy_3/azamatm/E3SM_simulations</dataroot> -->
+        <dataroot>/home/qingli/work/e3sm_res_cmp</dataroot>
+        <climoroot>/lus/theta-fs0/projects/ClimateEnergy_3/qingli</climoroot>
+        <roottype>run</roottype>
+        <machine>theta</machine>
+    </simulation>
+
+    <simulation name="test-gl-mesh">
+        <longname>gl-mesh</longname>
+        <dataroot>/Users/qingli/data/mpas/test</dataroot>
+        <climoroot>/Users/qingli/data/mpas/test</climoroot>
+        <roottype>test</roottype>
+        <machine>pn1803144</machine>
+    </simulation>
+
+    <simulation name="test-high-res">
+        <longname>high-res</longname>
+        <dataroot>/Users/qingli/data/mpas/test</dataroot>
+        <climoroot>/Users/qingli/data/mpas/test</climoroot>
+        <roottype>test</roottype>
+        <machine>pn1803144</machine>
+    </simulation>
+
+    <simulation name="test-low-res">
+        <longname>low-res</longname>
+        <dataroot>/Users/qingli/data/mpas/test</dataroot>
+        <climoroot>/Users/qingli/data/mpas/test</climoroot>
+        <roottype>test</roottype>
+        <machine>pn1803144</machine>
+    </simulation>
+</data>
+
