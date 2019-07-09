@@ -53,16 +53,18 @@ class E3SMSimulation(object):
         data_root = self.dataroot+'/'+self.longname
         climo_root = self.climoroot+'/e3sm_climo/'+self.longname+'/{:04d}-{:04d}/'.format(climo_yr0, climo_yr1)+comp
         ts_root = self.climoroot+'/e3sm_ts/'+self.longname+'/{:04d}-{:04d}/'.format(ts_yr0, ts_yr1)+comp
-        fig_root = os.environ['HOME']+'/work/e3sm_res_cmp/figures/'+self.runname+'/{:04d}-{:04d}'.format(climo_yr0, climo_yr1)
         if self.roottype == 'run':
             rst_root = data_root+'/run'
             mon_root = data_root+'/run'
+            fig_root = os.environ['HOME']+'/work/e3sm_res_cmp/figures/'+self.runname+'/{:04d}-{:04d}'.format(climo_yr0, climo_yr1)
         elif self.roottype == 'archive':
             rst_root = data_root+'/rest/{:04d}-01-01-00000'.format(rest_yr)
             mon_root = data_root+'/'+comp+'/hist'
+            fig_root = os.environ['HOME']+'/work/e3sm_res_cmp/figures/'+self.runname+'/{:04d}-{:04d}'.format(climo_yr0, climo_yr1)
         elif self.roottype == 'test':
             rst_root = data_root
             mon_root = data_root
+            fig_root = os.environ['HOME']+'/work/e3sm_res_cmp/figures/'+self.runname
         else:
             raise ValueError('Root type \'{}\' not supported'.format(self.roottype))
         path = {'rst_root': rst_root,

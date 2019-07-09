@@ -1210,45 +1210,62 @@ class VerticalTransect(object):
         :depth: (float) maximum depth of transect
 
         """
+        self.name  = name
         if name == 'AR7W':
             print('Pre-defined transect \'{}\'.'.format(name))
-            self.name=name
-            self.lon0=304
-            self.lat0=53.5
-            self.lon1=312
-            self.lat1=61
-            self.depth=4500.0
+            self.lon0  = 304
+            self.lat0  = 53.5
+            self.lon1  = 312
+            self.lat1  = 61
+            self.depth = 4500.0
         elif name == 'Davis Strait':
             print('Pre-defined transect \'{}\'.'.format(name))
-            self.name=name
-            self.lon0=298.5
-            self.lat0=66.5
-            self.lon1=306
-            self.lat1=67
-            self.depth=1500.0
+            self.lon0  = 298.5
+            self.lat0  = 66.5
+            self.lon1  = 306
+            self.lat1  = 67
+            self.depth = 1500.0
         elif name == 'Hudson Strait':
             print('Pre-defined transect \'{}\'.'.format(name))
-            self.name=name
-            self.lon0=295.2
-            self.lat0=60.4
-            self.lon1=293.7
-            self.lat1=61.9
-            self.depth=1000.0
+            self.lon0  = 295.2
+            self.lat0  = 60.4
+            self.lon1  = 293.7
+            self.lat1  = 61.9
+            self.depth = 1000.0
+        elif name == 'Nares Strait':
+            print('Pre-defined transect \'{}\'.'.format(name))
+            self.lon0  = 284.2
+            self.lat0  = 78.0
+            self.lon1  = 287.5
+            self.lat1  = 78.0
+            self.depth = 1000.0
+        elif name == 'Parry Channel':
+            print('Pre-defined transect \'{}\'.'.format(name))
+            self.lon0  = 281.2
+            self.lat0  = 73.7
+            self.lon1  = 279.7
+            self.lat1  = 74.6
+            self.depth = 1000.0
+        elif name == 'Jones Sound':
+            print('Pre-defined transect \'{}\'.'.format(name))
+            self.lon0  = 279.5
+            self.lat0  = 75.6
+            self.lon1  = 280
+            self.lat1  = 76.2
+            self.depth = 1000.0
         elif name == 'LabSea Center':
             print('Pre-defined transect \'{}\'.'.format(name))
-            self.name=name
-            self.lon0=296
-            self.lat0=63
-            self.lon1=320
-            self.lat1=50
-            self.depth=4500.0
+            self.lon0  = 296
+            self.lat0  = 63
+            self.lon1  = 320
+            self.lat1  = 50
+            self.depth = 4500.0
         else:
             print('User defined transect \'{}\'.'.format(name))
-            self.name = name
-            self.lon0 = lon0
-            self.lat0 = lat0
-            self.lon1 = lon1
-            self.lat1 = lat1
+            self.lon0  = lon0
+            self.lat0  = lat0
+            self.lon1  = lon1
+            self.lat1  = lat1
             self.depth = depth
 
     def interpolate(self, npoints):
@@ -1301,6 +1318,8 @@ def region_latlon(region_name):
         rg = region(lon_ll=296.0, lat_ll=36.0, lon_ur=356.0, lat_ur=70.0)
     elif region_name == 'LabSea_SD1':
         rg = region(lon_ll=304.0, lat_ll=56.0, lon_ur=312.0, lat_ur=60.0)
+    elif region_name == 'Greenland':
+        rg = region(lon_ll=296.0, lat_ll=46.0, lon_ur=356.0, lat_ur=85.0)
     elif region_name == 'test':
         rg = region(lon_ll=310.0, lat_ll=55.0, lon_ur=320.0, lat_ur=65.0)
     else:
