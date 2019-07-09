@@ -65,5 +65,13 @@
         <roottype>test</roottype>
         <machine>pn1803144</machine>
     </simulation>
+
+    <simulation name="test-conus">
+        <longname>conus</longname>
+        <dataroot>/Users/qingli/data/mpas/test</dataroot>
+        <climoroot>/Users/qingli/data/mpas/test</climoroot>
+        <roottype>test</roottype>
+        <machine>pn1803144</machine>
+    </simulation>
 </data>
 
