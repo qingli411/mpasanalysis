@@ -10,12 +10,12 @@ def main():
     global s2_s_lon, s2_s_lat, s2_e_lon, s2_e_lat
 
     # get paths of restart files, monthly mean output files, processed climatology files and output figures
-    ts_ys = 1
-    ts_ye = 20
-    plt_ys = 1
-    plt_ye = 20
+    ts_ys = 21
+    ts_ye = 50
+    plt_ys = 21
+    plt_ye = 50
     nmon = 12 # 12 for production and 1 for testing
-    runname = 'gl-mesh'
+    runname = 'gl-mesh-gm1800'
     data_root = e3sm_res_cmp.load_paths_ocn(climo_ys=ts_ys, climo_ye=ts_ye, ts_ys=ts_ys, ts_ye=ts_ye, runname=runname)
     rst_root = data_root['rst_root']
     mon_root = data_root['mon_root']
@@ -64,7 +64,7 @@ def main():
 
     fig_dir = fig_root+'/Animation/'+varname
     os.makedirs(fig_dir, exist_ok=True)
-    for y in np.arange(plt_ys, plt_ye)+1:
+    for y in np.arange(plt_ys, plt_ye):
         for m in np.arange(nmon)+1:
             print('{:04d}-{:02d}'.format(y, m))
             mon_file = mon_root+'/mpaso.hist.am.timeSeriesStatsMonthly.{:04d}-{:02d}-01.nc'.format(y, m)
@@ -86,7 +86,7 @@ def main():
 
     fig_dir = fig_root+'/Animation/'+varname
     os.makedirs(fig_dir, exist_ok=True)
-    for y in np.arange(plt_ys, plt_ye)+1:
+    for y in np.arange(plt_ys, plt_ye):
         for m in np.arange(nmon)+1:
             print('{:04d}-{:02d}'.format(y, m))
             mon_file = mon_root+'/mpaso.hist.am.timeSeriesStatsMonthly.{:04d}-{:02d}-01.nc'.format(y, m)

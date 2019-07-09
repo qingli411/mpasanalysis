@@ -9,12 +9,12 @@ def main():
     global s2_s_lon, s2_s_lat, s2_e_lon, s2_e_lat
 
     # get paths of restart files, monthly mean output files, processed climatology files and output figures
-    ts_ys = 46
-    ts_ye = 55
-    plt_ys = 46
-    plt_ye = 55
+    ts_ys = 41
+    ts_ye = 50
+    plt_ys = 41
+    plt_ye = 50
     nmon = 12 # 12 for production and 1 for testing
-    runname = 'low-res-gm6h'
+    runname = 'gl-mesh-gm1800'
     data_root = e3sm_res_cmp.load_paths_ocn(climo_ys=ts_ys, climo_ye=ts_ye, ts_ys=ts_ys, ts_ye=ts_ye, runname=runname)
     rst_root = data_root['rst_root']
     mon_root = data_root['mon_root']
@@ -40,7 +40,7 @@ def main():
     refMidDepth = 0.5*(refTopDepth+refBottomDepth)
 
     # transect
-    trnsct = transect('AR7W')
+    trnsct = VerticalTransect('AR7W')
 
     # velocity
     varname_x = 'timeMonthly_avg_velocityZonal'

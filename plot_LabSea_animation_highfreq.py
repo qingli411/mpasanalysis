@@ -1,24 +1,29 @@
 #!/usr/bin/env python
 
 from mpasanalysis import *
-import e3sm_res_cmp
+# import e3sm_res_cmp
+from e3sm_simulations import *
 
 def main():
     global fig_dir, mpasmesh
     global lon, lat, refMidDepth, cellArea, refLayerThickness, bottomDepth
 
     # get paths of restart files, monthly mean output files, processed climatology files and output figures
-    ts_ys = 46
-    ts_ye = 55
-    plt_ys = 46
-    plt_ye = 55
+    ts_yr0 = 21
+    ts_yr1 = 30
+    plt_yr0 = 21
+    plt_yr1 = 30
+    rest_yr = ts_yr1+1
     nmon = 12 # 12 for production and 1 for testing
-    data_root = e3sm_res_cmp.load_paths_ocn(climo_ys=ts_ys, climo_ye=ts_ye,
-                                            ts_ys=ts_ys, ts_ye=ts_ye)
+    # data_root = e3sm_res_cmp.load_paths_ocn(climo_ys=ts_ys, climo_ye=ts_ye,
+    #                                         ts_ys=ts_ys, ts_ye=ts_ye, runname='conus01')
+    run = E3SMSimulation(database='e3sm_simulations.xml', runname='conus01')
+    data_root = run.get_path(comp='ocn', climo_yr0=ts_yr0, climo_yr1=ts_yr1,
+                             ts_yr0=ts_yr0, ts_yr1=ts_yr1, rest_yr=rest_yr)
     rst_root = data_root['rst_root']
     mon_root = data_root['mon_root']
     fig_root = data_root['fig_root']
-    rst_file = rst_root+'/mpaso.rst.{:04d}-01-01_00000.nc'.format(ts_ye+1)
+    rst_file = rst_root+'/mpaso.rst.{:04d}-01-01_00000.nc'.format(rest_yr)
 
     # load dataset
     mpasmesh = MPASMesh(filepath=rst_file)
@@ -53,17 +58,17 @@ def main():
     # units = 'psu'
     # levels = np.linspace(28, 36, 81)
 
-    varname = 'salinityAt250m'
-    units = 'psu'
-    levels = np.linspace(34.7, 35.5, 41)
+    # varname = 'salinityAt250m'
+    # units = 'psu'
+    # levels = np.linspace(34.7, 35.5, 41)
 
     # MLD (m)
 
-    # varname = 'tThreshMLD'
-    # units = 'm'
-    # levels = np.array([0, 10, 20, 30, 40, 50, 60, 70, 80, 90,
-    #                    110, 130, 150, 180, 210, 240, 280, 320, 360,
-    #                    407, 454, 500, 1000, 1500, 2000])
+    varname = 'dThreshMLD'
+    units = 'm'
+    levels = np.array([0, 10, 20, 30, 40, 50, 60, 70, 80, 90,
+                       110, 130, 150, 180, 210, 240, 280, 320, 360,
+                       407, 454, 500, 1000, 1500, 2000])
 
     # relative vorticity at 250 m (s^{-1})
     # varname = 'relativeVorticityAt250m'
@@ -72,7 +77,7 @@ def main():
 
     fig_dir = fig_root+'/Animation/highfreq/'+varname
     os.makedirs(fig_dir, exist_ok=True)
-    for y in np.arange(plt_ye-plt_ys+1)+plt_ys:
+    for y in np.arange(plt_yr1-plt_yr0+1)+plt_yr0:
         for m in np.arange(nmon)+1:
             print('{:04d}-{:02d}'.format(y, m))
             mon_file = mon_root+'/mpaso.hist.am.highFrequencyOutput.{:04d}-{:02d}-01_00.00.00.nc'.format(y, m)
