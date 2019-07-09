@@ -18,7 +18,7 @@
     </simulation>
 
     <simulation name="gl-mesh-gm1800">
-        <longname>20190523.GM1800.A_WCYCL1850.ne30_oGNLD30to10.anvil</longname>
+        <longname>20190617.GM1800.A_WCYCL1850.ne30_oGNLD30to10.anvil</longname>
         <dataroot>/lcrc/group/acme/jwolfe/acme_scratch/anvil</dataroot>
         <climoroot>/lcrc/group/acme/qingli</climoroot>
         <roottype>run</roottype>
