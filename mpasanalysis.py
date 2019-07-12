@@ -299,6 +299,33 @@ class MPASMesh(object):
         out = m.ax.add_collection(lc)
         return out
 
+    def plot_edges_xy(self, axis=None, **kwargs):
+        # use curret axis if not specified
+        if axis is None:
+            axis = plt.gca()
+        # load edge data
+        fmesh = self.load()
+        xVertex         = fmesh.variables['xVertex'][:]
+        yVertex         = fmesh.variables['yVertex'][:]
+        verticesOnEdge  = fmesh.variables['verticesOnEdge'][:]
+        dvEdge          = fmesh.variables['dvEdge'][:]
+        dvEdge_max = dvEdge.max()
+        lines = []
+        nedges=verticesOnEdge.shape[0]
+        for i in np.arange(nedges):
+            idx_vertex0 = verticesOnEdge[i,0]-1
+            idx_vertex1 = verticesOnEdge[i,1]-1
+            xP0 = xVertex[idx_vertex0]
+            yP0 = yVertex[idx_vertex0]
+            xP1 = xVertex[idx_vertex1]
+            yP1 = yVertex[idx_vertex1]
+            # exclude the edges that connect periodic boundaries
+            if np.abs(xP0-xP1) <= dvEdge_max and np.abs(yP0-yP1) <= dvEdge_max:
+                lines.append([(xP0, yP0), (xP1, yP1)])
+        lc = LineCollection(lines, **kwargs)
+        out = axis.add_collection(lc)
+        return out
+
     class Path(object):
 
         """Path on MPASMesh object"""
@@ -406,8 +433,10 @@ class MPASOData(object):
         """Get map for variable
 
         :varname: (str) variable name
+        :position: (str) cell or vertex
         :name: (str) name of variable, optional
         :units: (str) units of variable, optional
+        :tidx: (int) time index
         :return: (MPASOMap object) map
 
         """
@@ -418,6 +447,31 @@ class MPASOData(object):
         if units is None:
             units = ncdata.units
         out = MPASOMap(data=ncdata[tidx,:], mesh=self.mesh, position=position, name=name, units=units)
+        return out
+
+    def get_domain(self, varname, position='cell', name=None, units=None, tidx=0, zidx=0):
+        """Get domain for variable
+
+        :varname: (str) variable name
+        :position: (str) cell or vertex
+        :name: (str) name of variable, optional
+        :units: (str) units of variable, optional
+        :tidx: (int) time index
+        :zidx: (int) time index
+        :return: (MPASOMap object) map
+
+        """
+
+        ncdata = self.load().variables[varname]
+        if name is None:
+            name = ncdata.long_name
+        if units is None:
+            units = ncdata.units
+        ndim = np.ndim(ncdata)
+        if ndim == 2:
+            out = MPASODomain(data=ncdata[tidx,:], mesh=self.mesh, position=position, name=name, units=units)
+        else:
+            out = MPASODomain(data=ncdata[tidx,:,zidx], mesh=self.mesh, position=position, name=name, units=units)
         return out
 
     def get_map_relative_vorticity(self, depth=0.0, mask=None, varname_prefix=''):
@@ -818,10 +872,10 @@ class MPASOMap(object):
     def _pcolor(self, m, position='cell', **kwargs):
         assert self.mesh is not None, 'Mesh file required for _pcolor.'
         fmesh = self.mesh.load()
-        lonCell         = np.degrees(fmesh.variables['lonCell'][:])
-        latCell         = np.degrees(fmesh.variables['latCell'][:])
-        lonVertex       = np.degrees(fmesh.variables['lonVertex'][:])
-        latVertex       = np.degrees(fmesh.variables['latVertex'][:])
+        lonCell   = np.degrees(fmesh.variables['lonCell'][:])
+        latCell   = np.degrees(fmesh.variables['latCell'][:])
+        lonVertex = np.degrees(fmesh.variables['lonVertex'][:])
+        latVertex = np.degrees(fmesh.variables['latVertex'][:])
         # bounds of the domain
         lonmax = np.mod(m.lonmax, 360)
         lonmin = np.mod(m.lonmin, 360)
@@ -1063,6 +1117,145 @@ class MPASOMap(object):
         fig = axis.tricontour(x, y, data, **kwargs)
         if label:
             axis.clabel(fig, fig.levels, fmt=label_fmt)
+
+#--------------------------------
+# MPASODomain
+#--------------------------------
+
+class MPASODomain(object):
+
+    """MPASODomain object"""
+
+    def __init__(self, data=None, mesh=None, position='cell', name=None, units=None):
+        """Initialize MPASODomain
+
+        :data: (1D numpy array) data at each location
+        :mesh: (MPASMesh) mesh object
+        :position: (str) data position on grid, 'cell' or 'vertex'
+        :name: (str) name of variable
+        :units: (str) units of variable
+
+        """
+        if data is not None:
+            self.data = data
+            self.name = name
+            self.units = units
+            self.mesh = mesh
+            self.position = position
+            print("Reading mesh data from {}".format(mesh.filepath))
+            fmesh = mesh.load()
+            if position == 'cell':
+                self.x = fmesh.variables['xCell'][:]
+                self.y = fmesh.variables['yCell'][:]
+                self.z = fmesh.variables['zCell'][:]
+            elif position == 'vertex':
+                self.x = fmesh.variables['xVertex'][:]
+                self.y = fmesh.variables['yVertex'][:]
+                self.z = fmesh.variables['zVertex'][:]
+            else:
+                raise ValueError('Unsupported position \'{}\''.format(position))
+
+    def _pcolor(self, axis=None, position='cell', **kwargs):
+        assert self.mesh is not None, 'Mesh file required for _pcolor.'
+        fmesh = self.mesh.load()
+        xCell   = fmesh.variables['xCell'][:]
+        yCell   = fmesh.variables['yCell'][:]
+        xVertex = fmesh.variables['xVertex'][:]
+        yVertex = fmesh.variables['yVertex'][:]
+        dvEdge          = fmesh.variables['dvEdge'][:]
+        dvEdge_max = dvEdge.max()
+        if position == 'cell':
+            verticesOnCell  = fmesh.variables['verticesOnCell'][:]
+            nEdgesOnCell    = fmesh.variables['nEdgesOnCell'][:]
+            # patches
+            patches = []
+            ncell = verticesOnCell.shape[0]
+            for i in np.arange(ncell):
+                idx_v = verticesOnCell[i,:nEdgesOnCell[i]]-1
+                xp = xVertex[idx_v]
+                yp = yVertex[idx_v]
+                if all(np.abs(xp[0:-1]-xp[1:]) <= dvEdge_max) and \
+                   all(np.abs(yp[0:-1]-yp[1:]) <= dvEdge_max):
+                    patches.append(Polygon(list(zip(xp,yp))))
+        elif position == 'vertex':
+            cellsOnVertex = fmesh.variables['cellsOnVertex'][:]
+            nEdgesOnCell    = fmesh.variables['nEdgesOnCell'][:]
+            # patches
+            patches = []
+            idx_mask = []
+            nvertex = cellsOnVertex.shape[0]
+            for i in np.arange(nvertex):
+                idx_c = cellsOnVertex[i,:]-1
+                if any(idx_c == -1):
+                    idx_mask.append(i)
+                    continue
+                xp = xCell[idx_c]
+                yp = yCell[idx_c]
+                if all(np.abs(xp[0:-1]-xp[1:]) <= dvEdge_max) and \
+                   all(np.abs(yp[0:-1]-yp[1:]) <= dvEdge_max):
+                    patches.append(Polygon(list(zip(xp,yp))))
+            data = np.delete(data, idx_mask)
+        else:
+            raise ValueError('Unsupported position \'{}\''.format(position))
+        # plot patch collection
+        pc = PatchCollection(patches, **kwargs)
+        pc.set_array(self.data)
+        pc.set_lw(0.1)
+        out = axis.add_collection(pc)
+        return out
+
+    def plot_xy(self, axis=None, ptype='pcolor', levels=None,
+             add_title=True, title=None, add_colorbar=True, cmap='rainbow', **kwargs):
+        """Plot scatters on a map
+
+        :axis: (matplotlib.axes, optional) axis to plot figure on
+        :ptype: (str) plot type, scatter, contourf etc.
+        :leveles: (list, optional) list of levels
+        :add_title: (bool) do not add title if False
+        :add_colorbar: (bool) do not add colorbar if False
+        :cmap: (str, optional) colormap
+        :**kwargs: (keyword arguments) to be passed to mpl_toolkits.basemap.scatter()
+        :return: (basemap) figure
+
+        """
+        # use curret axis if not specified
+        if axis is None:
+            axis = plt.gca()
+        # manually mapping levels to the colormap if levels is passed in,
+        if levels is not None:
+            bounds = np.array(levels)
+            norm = colors.BoundaryNorm(boundaries=bounds, ncolors=256)
+        else:
+            norm = None
+        # plot type
+        if ptype == 'pcolor':
+            fig = self._pcolor(axis=axis, position=self.position, norm=norm, cmap=plt.cm.get_cmap(cmap), alpha=1.0, **kwargs)
+        elif ptype == 'contourf':
+            fig = axis.tricontourf(self.x, self.y, self.data, levels=levels, extend='both',
+                        norm=norm, cmap=plt.cm.get_cmap(cmap), **kwargs)
+        else:
+            raise ValueError('Plot type {} not supported.'.format(ptype))
+        # add title
+        if add_title:
+            if title is None:
+                axis.set_title('{} ({})'.format(self.name, self.units))
+            else:
+                axis.set_title(title)
+        # add colorbar
+        if add_colorbar:
+            cb = plt.colorbar(fig, ax=axis)
+            cb.formatter.set_powerlimits((-4, 4))
+            cb.update_ticks()
+        # x- and y-limits and x- and y-labels
+        xmax = self.x.max()
+        xmin = self.x.min()
+        ymax = self.y.max()
+        ymin = self.y.min()
+        axis.set_xlim([xmin, xmax])
+        axis.set_ylim([xmin, ymax])
+        axis.set_xlabel('x')
+        axis.set_ylabel('y')
+        return fig
 
 #--------------------------------
 # MPASOVertCrossSection
