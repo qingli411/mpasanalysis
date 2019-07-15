@@ -508,7 +508,8 @@ class MPASOData(object):
         return vorticity
 
 
-    def get_transport(self, transect=None, path=None, varname=None, varname_prefix='', bolus=False):
+    def get_transport(self, transect=None, path=None, varname=None, varname_prefix='', bolus=False, \
+                      refval_diff=None, refval_ratio=None):
         """Compute the transport of variable across transect
 
         :transect: (VerticalTransect object) transect
@@ -516,6 +517,8 @@ class MPASOData(object):
         :varname: (str) variable name
         :varname_prefix: (str) variable name prefix (e.g., timeMonthly_avg_)
         :bolus: (bool) Add GM bolus velocity if True
+        :refval_diff: (float) Reference value (v-vref)
+        :refval_ratio: (float) Reference value (1-v/vref)
         :return: (float) transport
 
         """
@@ -524,12 +527,14 @@ class MPASOData(object):
                                                    path=path,
                                                    varname=varname,
                                                    varname_prefix=varname_prefix,
-                                                   bolus=bolus)
+                                                   bolus=bolus,
+                                                   refval=refval)
 
         transport = tran[:,-1]
         return transport
 
-    def get_transport_cumulative(self, transect=None, path=None, varname=None, varname_prefix='', bolus=False):
+    def get_transport_cumulative(self, transect=None, path=None, varname=None, varname_prefix='', bolus=False,\
+                                 refval_diff=None, refval_ratio=None):
         """Compute the cumulative transport of variable across transect
 
         :transect: (VerticalTransect object) transect
@@ -537,6 +542,8 @@ class MPASOData(object):
         :varname: (str) variable name
         :varname_prefix: (str) variable name prefix (e.g., timeMonthly_avg_)
         :bolus: (bool) Add GM bolus velocity if True
+        :refval_diff: (float) Reference value (v-vref)
+        :refval_ratio: (float) Reference value (1-v/vref)
         :return: ([float, float]) transport, distance
 
         """
@@ -561,6 +568,10 @@ class MPASOData(object):
             var_c0 = fdata.variables[varname_prefix+varname][:,idx_cells_on_edge[:,0],:]
             var_c1 = fdata.variables[varname_prefix+varname][:,idx_cells_on_edge[:,1],:]
             var = 0.5*(var_c0+var_c1)
+            if refval_diff is not None:
+                var = var-refval_diff
+            if refval_ratio is not None:
+                var = 1.0-var/refval_ratio
         layer_thickness_c0 = fdata.variables[varname_prefix+'layerThickness'][:,idx_cells_on_edge[:,0],:]
         layer_thickness_c1 = fdata.variables[varname_prefix+'layerThickness'][:,idx_cells_on_edge[:,1],:]
         dh_edge = 0.5*(layer_thickness_c0+layer_thickness_c1)
