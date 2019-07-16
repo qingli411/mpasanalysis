@@ -309,7 +309,8 @@ class MPASMesh(object):
         yVertex         = fmesh.variables['yVertex'][:]
         verticesOnEdge  = fmesh.variables['verticesOnEdge'][:]
         dvEdge          = fmesh.variables['dvEdge'][:]
-        dvEdge_max = dvEdge.max()
+        dvEdge_small = 1.0
+        dvEdge_max = dvEdge.max() + dvEdge_small
         lines = []
         nedges=verticesOnEdge.shape[0]
         for i in np.arange(nedges):
@@ -1174,7 +1175,8 @@ class MPASODomain(object):
         xVertex = fmesh.variables['xVertex'][:]
         yVertex = fmesh.variables['yVertex'][:]
         dvEdge          = fmesh.variables['dvEdge'][:]
-        dvEdge_max = dvEdge.max()
+        dvEdge_small = 1.0
+        dvEdge_max = dvEdge.max() + dvEdge_small
         if position == 'cell':
             verticesOnCell  = fmesh.variables['verticesOnCell'][:]
             nEdgesOnCell    = fmesh.variables['nEdgesOnCell'][:]
@@ -1283,7 +1285,7 @@ class MPASODomain(object):
         :yfrac: (float) normalized y coordinate [0, 1]
         :axis: (matplotlib.axes, optional) axis to plot figure on
         :**kwargs: (keyword arguments) arguments
-        :return: (basemap) figure
+        :return: (axis) axis of figure
 
         """
         xmax = self.x.max()
@@ -1302,9 +1304,9 @@ class MPASODomain(object):
         tree = spatial.KDTree(list(zip(self.x, self.y)))
         p = tree.query(pts)
         cidx = p[1]
-        fig = self._plot_transect(xy=self.x[cidx], xyidx=cidx, **kwargs)
-        fig.ax.set_xlabel('x')
-        return fig
+        ax = self._plot_transect(xy=self.x[cidx], xyidx=cidx, **kwargs)
+        ax.set_xlabel('x')
+        return ax
 
     def plot_yz(self, xfrac=0.5, **kwargs):
         """Plot yz-transect of a domain
@@ -1312,7 +1314,7 @@ class MPASODomain(object):
         :xfrac: (float) normalized x coordinate [0, 1]
         :axis: (matplotlib.axes, optional) axis to plot figure on
         :**kwargs: (keyword arguments) arguments
-        :return: (basemap) figure
+        :return: (axis) axis of figure
 
         """
         xmax = self.x.max()
@@ -1331,9 +1333,9 @@ class MPASODomain(object):
         tree = spatial.KDTree(list(zip(self.x, self.y)))
         p = tree.query(pts)
         cidx = p[1]
-        fig = self._plot_transect(xy=self.y[cidx], xyidx=cidx, **kwargs)
-        fig.ax.set_xlabel('y')
-        return fig
+        ax = self._plot_transect(xy=self.y[cidx], xyidx=cidx, **kwargs)
+        ax.set_xlabel('y')
+        return ax
 
     def _plot_transect(self, xy=None, xyidx=None, axis=None, ptype='contourf', levels=None, add_title=True, \
                       title=None, add_colorbar=True, cmap='viridis', **kwargs):
@@ -1348,7 +1350,7 @@ class MPASODomain(object):
         :add_colorbar: (bool) do not add colorbar if False
         :cmap: (str, optional) colormap
         :**kwargs: (keyword arguments) other arguments
-        :return: (basemap) figure
+        :return: (axis) axis of figure
 
         """
         # check dimension
@@ -1389,7 +1391,7 @@ class MPASODomain(object):
             cb.update_ticks()
         # add y-label
         axis.set_ylabel('Depth (m)')
-        return fig
+        return axis
 
 
 #--------------------------------
