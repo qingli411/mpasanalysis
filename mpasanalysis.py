@@ -449,7 +449,7 @@ class MPASOData(object):
         out = MPASOMap(data=ncdata[tidx,:], mesh=self.mesh, position=position, name=name, units=units)
         return out
 
-    def get_domain(self, varname, position='cell', name=None, units=None, tidx=0, zidx=0):
+    def get_domain(self, varname, position='cell', name=None, units=None, tidx=0):
         """Get domain for variable
 
         :varname: (str) variable name
@@ -457,7 +457,6 @@ class MPASOData(object):
         :name: (str) name of variable, optional
         :units: (str) units of variable, optional
         :tidx: (int) time index
-        :zidx: (int) time index
         :return: (MPASOMap object) map
 
         """
@@ -471,7 +470,7 @@ class MPASOData(object):
         if ndim == 2:
             out = MPASODomain(data=ncdata[tidx,:], mesh=self.mesh, position=position, name=name, units=units)
         else:
-            out = MPASODomain(data=ncdata[tidx,:,zidx], mesh=self.mesh, position=position, name=name, units=units)
+            out = MPASODomain(data=ncdata[tidx,:,:], mesh=self.mesh, position=position, name=name, units=units)
         return out
 
     def get_map_relative_vorticity(self, depth=0.0, mask=None, varname_prefix=''):
@@ -1013,7 +1012,7 @@ class MPASOMap(object):
         :add_title: (bool) do not add title if False
         :add_colorbar: (bool) do not add colorbar if False
         :cmap: (str, optional) colormap
-        :**kwargs: (keyword arguments) to be passed to mpl_toolkits.basemap.scatter()
+        :**kwargs: (keyword arguments) other arguments
         :return: (basemap) figure
 
         """
@@ -1149,6 +1148,7 @@ class MPASODomain(object):
         """
         if data is not None:
             self.data = data
+            self.ndim = np.ndim(data)
             self.name = name
             self.units = units
             self.mesh = mesh
@@ -1158,15 +1158,15 @@ class MPASODomain(object):
             if position == 'cell':
                 self.x = fmesh.variables['xCell'][:]
                 self.y = fmesh.variables['yCell'][:]
-                self.z = fmesh.variables['zCell'][:]
             elif position == 'vertex':
                 self.x = fmesh.variables['xVertex'][:]
                 self.y = fmesh.variables['yVertex'][:]
-                self.z = fmesh.variables['zVertex'][:]
             else:
                 raise ValueError('Unsupported position \'{}\''.format(position))
+            if self.ndim == 2:
+                self.z = fmesh.variables['refZMid'][:]
 
-    def _pcolor(self, axis=None, position='cell', **kwargs):
+    def _pcolor(self, data, axis=None, position='cell', **kwargs):
         assert self.mesh is not None, 'Mesh file required for _pcolor.'
         fmesh = self.mesh.load()
         xCell   = fmesh.variables['xCell'][:]
@@ -1210,22 +1210,23 @@ class MPASODomain(object):
             raise ValueError('Unsupported position \'{}\''.format(position))
         # plot patch collection
         pc = PatchCollection(patches, **kwargs)
-        pc.set_array(self.data)
+        pc.set_array(data)
         pc.set_lw(0.1)
         out = axis.add_collection(pc)
         return out
 
-    def plot_xy(self, axis=None, ptype='pcolor', levels=None,
-             add_title=True, title=None, add_colorbar=True, cmap='rainbow', **kwargs):
-        """Plot scatters on a map
+    def plot_xy(self, zidx=0, axis=None, ptype='pcolor', levels=None,
+             add_title=True, title=None, add_colorbar=True, cmap='viridis', **kwargs):
+        """Plot horizontal map of a domain
 
+        :zidx: (int) z index
         :axis: (matplotlib.axes, optional) axis to plot figure on
         :ptype: (str) plot type, scatter, contourf etc.
         :leveles: (list, optional) list of levels
         :add_title: (bool) do not add title if False
         :add_colorbar: (bool) do not add colorbar if False
         :cmap: (str, optional) colormap
-        :**kwargs: (keyword arguments) to be passed to mpl_toolkits.basemap.scatter()
+        :**kwargs: (keyword arguments) other arguments
         :return: (basemap) figure
 
         """
@@ -1238,12 +1239,20 @@ class MPASODomain(object):
             norm = colors.BoundaryNorm(boundaries=bounds, ncolors=256)
         else:
             norm = None
+        # data
+        if self.ndim == 1:
+            data = self.data
+        elif self.ndim == 2:
+            data = self.data[:,zidx]
+        else:
+            raise ValueError('Dimension mismatch.')
         # plot type
         if ptype == 'pcolor':
-            fig = self._pcolor(axis=axis, position=self.position, norm=norm, cmap=plt.cm.get_cmap(cmap), alpha=1.0, **kwargs)
+            fig = self._pcolor(data=data, axis=axis, position=self.position, norm=norm, \
+                               cmap=plt.cm.get_cmap(cmap), alpha=1.0, **kwargs)
         elif ptype == 'contourf':
-            fig = axis.tricontourf(self.x, self.y, self.data, levels=levels, extend='both',
-                        norm=norm, cmap=plt.cm.get_cmap(cmap), **kwargs)
+            fig = axis.tricontourf(self.x, self.y, data, levels=levels, extend='both', \
+                                   norm=norm, cmap=plt.cm.get_cmap(cmap), **kwargs)
         else:
             raise ValueError('Plot type {} not supported.'.format(ptype))
         # add title
@@ -1267,6 +1276,121 @@ class MPASODomain(object):
         axis.set_xlabel('x')
         axis.set_ylabel('y')
         return fig
+
+    def plot_xz(self, yfrac=0.5, **kwargs):
+        """Plot xz-transect of a domain
+
+        :yfrac: (float) normalized y coordinate [0, 1]
+        :axis: (matplotlib.axes, optional) axis to plot figure on
+        :**kwargs: (keyword arguments) arguments
+        :return: (basemap) figure
+
+        """
+        xmax = self.x.max()
+        xmin = self.x.min()
+        ymax = self.y.max()
+        ymin = self.y.min()
+        cellarea = self.mesh.load().variables['areaCell'][:]
+        d_cell = np.sqrt(cellarea.mean())
+        npoints = int(np.ceil((xmax-xmin)/d_cell))
+        print('Nearest neighbor interpolation to {} points.'.format(npoints))
+        ymid = yfrac*(ymax-ymin)+ymin
+        xx = np.linspace(xmin, xmax, npoints+1)
+        yy = np.ones(xx.size)*ymid
+        # select nearest neighbor
+        pts = np.array(list(zip(xx, yy)))
+        tree = spatial.KDTree(list(zip(self.x, self.y)))
+        p = tree.query(pts)
+        cidx = p[1]
+        fig = self._plot_transect(xy=self.x[cidx], xyidx=cidx, **kwargs)
+        fig.ax.set_xlabel('x')
+        return fig
+
+    def plot_yz(self, xfrac=0.5, **kwargs):
+        """Plot yz-transect of a domain
+
+        :xfrac: (float) normalized x coordinate [0, 1]
+        :axis: (matplotlib.axes, optional) axis to plot figure on
+        :**kwargs: (keyword arguments) arguments
+        :return: (basemap) figure
+
+        """
+        xmax = self.x.max()
+        xmin = self.x.min()
+        ymax = self.y.max()
+        ymin = self.y.min()
+        cellarea = self.mesh.load().variables['areaCell'][:]
+        d_cell = np.sqrt(cellarea.mean())
+        npoints = int(np.ceil((ymax-ymin)/d_cell))
+        print('Nearest neighbor interpolation to {} points.'.format(npoints))
+        xmid = xfrac*(xmax-xmin)+xmin
+        yy = np.linspace(ymin, ymax, npoints+1)
+        xx = np.ones(yy.size)*xmid
+        # select nearest neighbor
+        pts = np.array(list(zip(xx, yy)))
+        tree = spatial.KDTree(list(zip(self.x, self.y)))
+        p = tree.query(pts)
+        cidx = p[1]
+        fig = self._plot_transect(xy=self.y[cidx], xyidx=cidx, **kwargs)
+        fig.ax.set_xlabel('y')
+        return fig
+
+    def _plot_transect(self, xy=None, xyidx=None, axis=None, ptype='contourf', levels=None, add_title=True, \
+                      title=None, add_colorbar=True, cmap='viridis', **kwargs):
+        """Plot transect of a domain
+
+        :xy: (numpy array) horizontal dimension
+        :xyidx: (int) xy index
+        :axis: (matplotlib.axes, optional) axis to plot figure on
+        :ptype: (str) plot type, scatter, contourf etc.
+        :leveles: (list, optional) list of levels
+        :add_title: (bool) do not add title if False
+        :add_colorbar: (bool) do not add colorbar if False
+        :cmap: (str, optional) colormap
+        :**kwargs: (keyword arguments) other arguments
+        :return: (basemap) figure
+
+        """
+        # check dimension
+        assert self.ndim == 2, '2D domain has no transect.'
+        # check input
+        assert xy is not None, 'horizontal dimension xy required.'
+        assert xyidx is not None, 'horizonal dimension indices xyidx required.'
+        # use curret axis if not specified
+        if axis is None:
+            axis = plt.gca()
+        # manually mapping levels to the colormap if levels is passed in,
+        if levels is not None:
+            bounds = np.array(levels)
+            norm = colors.BoundaryNorm(boundaries=bounds, ncolors=256)
+        else:
+            norm = None
+        # get transect
+        data = self.data[xyidx,:]
+        # plot figure
+        if ptype == 'contourf':
+            fig = axis.contourf(xy, self.z, np.transpose(data), levels=levels, extend='both', \
+                                norm=norm, cmap=plt.cm.get_cmap(cmap), **kwargs)
+        elif ptype == 'pcolor':
+            fig = axis.pcolor(xy, self.z, np.transpose(data), \
+                              norm=norm, cmap=plt.cm.get_cmap(cmap), **kwargs)
+        else:
+            raise ValueError('Plot type {} not supported.'.format(ptype))
+        # add title
+        if add_title:
+            if title is None:
+                axis.set_title('{} ({})'.format(self.name, self.units))
+            else:
+                axis.set_title(title)
+        # add colorbar
+        if add_colorbar:
+            cb = plt.colorbar(fig, ax=axis)
+            cb.formatter.set_powerlimits((-4, 4))
+            cb.update_ticks()
+        # add y-label
+        axis.set_ylabel('Depth (m)')
+        return fig
+
 
 #--------------------------------
 # MPASOVertCrossSection
