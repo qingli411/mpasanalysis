@@ -305,14 +305,13 @@ class MPASMesh(object):
             axis = plt.gca()
         # load edge data
         fmesh = self.load()
+        xCell           = fmesh.variables['xCell'][:]
+        yCell           = fmesh.variables['yCell'][:]
         xVertex         = fmesh.variables['xVertex'][:]
         yVertex         = fmesh.variables['yVertex'][:]
         verticesOnEdge  = fmesh.variables['verticesOnEdge'][:]
-        dvEdge          = fmesh.variables['dvEdge'][:]
-        dvEdge_small = 1.0
-        dvEdge_max = dvEdge.max() + dvEdge_small
         lines = []
-        nedges=verticesOnEdge.shape[0]
+        nedges = verticesOnEdge.shape[0]
         for i in np.arange(nedges):
             idx_vertex0 = verticesOnEdge[i,0]-1
             idx_vertex1 = verticesOnEdge[i,1]-1
@@ -320,11 +319,52 @@ class MPASMesh(object):
             yP0 = yVertex[idx_vertex0]
             xP1 = xVertex[idx_vertex1]
             yP1 = yVertex[idx_vertex1]
-            # exclude the edges that connect periodic boundaries
-            if np.abs(xP0-xP1) <= dvEdge_max and np.abs(yP0-yP1) <= dvEdge_max:
-                lines.append([(xP0, yP0), (xP1, yP1)])
+            lines.append([(xP0, yP0), (xP1, yP1)])
         lc = LineCollection(lines, **kwargs)
         out = axis.add_collection(lc)
+        return out
+
+    def plot_celledges_xy(self, axis=None):
+        # use curret axis if not specified
+        if axis is None:
+            axis = plt.gca()
+        # load edge data
+        fmesh = self.load()
+        xCell           = fmesh.variables['xCell'][:]
+        yCell           = fmesh.variables['yCell'][:]
+        xVertex         = fmesh.variables['xVertex'][:]
+        yVertex         = fmesh.variables['yVertex'][:]
+        verticesOnCell  = fmesh.variables['verticesOnCell'][:]
+        nEdgesOnCell    = fmesh.variables['nEdgesOnCell'][:]
+        dvEdge          = fmesh.variables['dvEdge'][:]
+        dvEdge_small = 1.0
+        dvEdge_max = dvEdge.max() + dvEdge_small
+        x_period = fmesh.x_period
+        y_period = fmesh.y_period
+        patches = []
+        ncells = nEdgesOnCell.shape[0]
+        for i in np.arange(ncells):
+            nedges = nEdgesOnCell[i]
+            idx_v = verticesOnCell[i,:nedges]-1
+            xp = xVertex[idx_v]
+            yp = yVertex[idx_v]
+            if any(np.abs(xp[0:-1]-xp[1:]) > dvEdge_max) or \
+               any(np.abs(yp[0:-1]-yp[1:]) > dvEdge_max):
+                xc = xCell[i]
+                yc = yCell[i]
+                for j in np.arange(nedges):
+                    if xp[j] - xc > dvEdge_max:
+                        xp[j] -= x_period
+                    elif xp[j] - xc < -dvEdge_max:
+                        xp[j] += x_period
+                    if yp[j] - yc > dvEdge_max:
+                        yp[j] -= y_period
+                    elif yp[j] - yc < -dvEdge_max:
+                        yp[j] += y_period
+            patches.append(Polygon(list(zip(xp,yp))))
+        pc = PatchCollection(patches, facecolors='none', edgecolors='black', alpha=1.0)
+        pc.set_lw(1)
+        out = axis.add_collection(pc)
         return out
 
     class Path(object):
@@ -1174,9 +1214,11 @@ class MPASODomain(object):
         yCell   = fmesh.variables['yCell'][:]
         xVertex = fmesh.variables['xVertex'][:]
         yVertex = fmesh.variables['yVertex'][:]
-        dvEdge          = fmesh.variables['dvEdge'][:]
+        dvEdge  = fmesh.variables['dvEdge'][:]
         dvEdge_small = 1.0
         dvEdge_max = dvEdge.max() + dvEdge_small
+        x_period = fmesh.x_period
+        y_period = fmesh.y_period
         if position == 'cell':
             verticesOnCell  = fmesh.variables['verticesOnCell'][:]
             nEdgesOnCell    = fmesh.variables['nEdgesOnCell'][:]
@@ -1187,9 +1229,20 @@ class MPASODomain(object):
                 idx_v = verticesOnCell[i,:nEdgesOnCell[i]]-1
                 xp = xVertex[idx_v]
                 yp = yVertex[idx_v]
-                if all(np.abs(xp[0:-1]-xp[1:]) <= dvEdge_max) and \
-                   all(np.abs(yp[0:-1]-yp[1:]) <= dvEdge_max):
-                    patches.append(Polygon(list(zip(xp,yp))))
+                if any(np.abs(xp[0:-1]-xp[1:]) > dvEdge_max) or \
+                   any(np.abs(yp[0:-1]-yp[1:]) > dvEdge_max):
+                    xc = xCell[i]
+                    yc = yCell[i]
+                    for j in np.arange(nEdgesOnCell[i]):
+                        if xp[j] - xc > dvEdge_max:
+                            xp[j] -= x_period
+                        elif xp[j] - xc < -dvEdge_max:
+                            xp[j] += x_period
+                        if yp[j] - yc > dvEdge_max:
+                            yp[j] -= y_period
+                        elif yp[j] - yc < -dvEdge_max:
+                            yp[j] += y_period
+                patches.append(Polygon(list(zip(xp,yp))))
         elif position == 'vertex':
             cellsOnVertex = fmesh.variables['cellsOnVertex'][:]
             nEdgesOnCell    = fmesh.variables['nEdgesOnCell'][:]
@@ -1204,9 +1257,20 @@ class MPASODomain(object):
                     continue
                 xp = xCell[idx_c]
                 yp = yCell[idx_c]
-                if all(np.abs(xp[0:-1]-xp[1:]) <= dvEdge_max) and \
-                   all(np.abs(yp[0:-1]-yp[1:]) <= dvEdge_max):
-                    patches.append(Polygon(list(zip(xp,yp))))
+                if any(np.abs(xp[0:-1]-xp[1:]) > dvEdge_max) or \
+                   any(np.abs(yp[0:-1]-yp[1:]) > dvEdge_max):
+                    xc = xVertex[i]
+                    yc = yVertex[i]
+                    for j in np.arange(3):
+                        if xp[j] - xc > dvEdge_max:
+                            xp[j] = xp[j] - x_period
+                        elif xp[j] - xc < -dvEdge_max:
+                            xp[j] = xp[j] + x_period
+                        if yp[j] - yc > dvEdge_max:
+                            yp[j] = yp[j] - y_period
+                        elif yp[j] - yc < -dvEdge_max:
+                            yp[j] = yp[j] + y_period
+                patches.append(Polygon(list(zip(xp,yp))))
             data = np.delete(data, idx_mask)
         else:
             raise ValueError('Unsupported position \'{}\''.format(position))
