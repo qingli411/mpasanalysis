@@ -515,7 +515,8 @@ class MPASOData(object):
             out = MPASODomain(data=ncdata[tidx,:,:], mesh=self.mesh, position=position, name=name, units=units)
         return out
 
-    def get_profile(self, varname, idx, position='cell', name=None, units=None):
+    def get_profile(self, varname, idx, position='cell', name=None, units=None,
+                    tidx_start=None, tidx_end=None):
         """Get profile for variable
 
         :varname: (str) variable name
@@ -523,6 +524,8 @@ class MPASOData(object):
         :idx: (int) index for cell or vertex
         :name: (str) name of variable, optional
         :units: (str) units of variable, optional
+        :tidx_start: (int) starting index
+        :tidx_end: (int) ending index
         :return: (MPASOProfile object) profile
 
         """
@@ -536,7 +539,7 @@ class MPASOData(object):
         ndim = np.ndim(ncdata)
         assert ndim == 3, 'Cannot get profile for {:d}-dimensional variable. Stop.'.format(ndim)
         # time
-        xtime = chartostring(fdata.variables['xtime'][:])
+        xtime = chartostring(fdata.variables['xtime'][tidx_start:tidx_end,:])
         time = [datetime.strptime(x.strip(), '%Y-%m-%d_%H:%M:%S') for x in xtime]
         # z
         fmesh = self.mesh.load()
@@ -544,7 +547,7 @@ class MPASOData(object):
         # MPASOProfile
         out = MPASOProfile(time=time, time_name='Time', time_units=None,
                            z=depth, z_name='z', z_units='m',
-                           data=ncdata[:,idx,:], data_name=name, data_units=units)
+                           data=ncdata[tidx_start:tidx_end,idx,:], data_name=name, data_units=units)
         return out
 
 
