@@ -5,7 +5,8 @@ import time
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.colors as colors
-from netCDF4 import Dataset
+from datetime import datetime
+from netCDF4 import Dataset, chartostring
 from scipy import spatial
 from mpl_toolkits.basemap import Basemap
 from matplotlib.collections import LineCollection, PatchCollection
@@ -498,7 +499,7 @@ class MPASOData(object):
         :name: (str) name of variable, optional
         :units: (str) units of variable, optional
         :tidx: (int) time index
-        :return: (MPASOMap object) map
+        :return: (MPASODomain object) domain
 
         """
 
@@ -513,6 +514,39 @@ class MPASOData(object):
         else:
             out = MPASODomain(data=ncdata[tidx,:,:], mesh=self.mesh, position=position, name=name, units=units)
         return out
+
+    def get_profile(self, varname, idx, position='cell', name=None, units=None):
+        """Get profile for variable
+
+        :varname: (str) variable name
+        :position: (str) cell or vertex
+        :idx: (int) index for cell or vertex
+        :name: (str) name of variable, optional
+        :units: (str) units of variable, optional
+        :return: (MPASOProfile object) profile
+
+        """
+        # data
+        fdata = self.load()
+        ncdata = fdata.variables[varname]
+        if name is None:
+            name = ncdata.long_name
+        if units is None:
+            units = ncdata.units
+        ndim = np.ndim(ncdata)
+        assert ndim == 3, 'Cannot get profile for {:d}-dimensional variable. Stop.'.format(ndim)
+        # time
+        xtime = chartostring(fdata.variables['xtime'][:])
+        time = [datetime.strptime(x.strip(), '%Y-%m-%d_%H:%M:%S') for x in xtime]
+        # z
+        fmesh = self.mesh.load()
+        depth = fmesh.variables['refZMid'][:]
+        # MPASOProfile
+        out = MPASOProfile(time=time, time_name='Time', time_units=None,
+                           z=depth, z_name='z', z_units='m',
+                           data=ncdata[:,idx,:], data_name=name, data_units=units)
+        return out
+
 
     def get_map_relative_vorticity(self, depth=0.0, mask=None, varname_prefix=''):
         """Get map of relative vorticity
@@ -1170,6 +1204,116 @@ class MPASOMap(object):
             axis.clabel(fig, fig.levels, fmt=label_fmt)
 
 #--------------------------------
+# MPASOVertCrossSection
+#--------------------------------
+
+class MPASOVertCrossSection(object):
+
+    """MPASOVertCrossSection object"""
+
+    def __init__(self, data, lon, lat, dist, depth, name, units, bottomdepth=None):
+        """Initialize MPASOCrossSection
+
+        :data: (1D numpy array) data array
+        :lon: (1D numpy array) longitude array
+        :lat: (1D numpy array) latitude array
+        :dist: (1D numpy array) distance array
+        :depth: (1D numpy array) depth array
+        :bottomdepth: (1D numpy array) depth of bottom
+        :name: (str) name of variable
+        :units: (str) units of variable
+
+        """
+        if bottomdepth is not None:
+            for i in np.arange(bottomdepth.size):
+                idxd = depth>bottomdepth[i]
+                data[i,idxd] = np.nan
+        self.data = data
+        self.lon = lon
+        self.lat = lat
+        self.dist = dist
+        self.depth = depth
+        self.bottomdepth = bottomdepth
+        self.name = name
+        self.units = units
+
+    def plot(self, axis=None, ptype='contourf', depth_mode='linear', levels=None, add_title=True, add_colorbar=True, invert_yaxis=True, cmap='rainbow', **kwargs):
+        """Plot scatters on a map
+
+        :axis: (matplotlib.axes, optional) axis to plot figure on
+        :ptype: (str) plot type, contourf, pcolor etc.
+        :depth_mode: (str) 'linear', 'native' (native grid) or 'symlog' (linear above 100 m and log below)
+        :leveles: (list, optional) list of levels
+        :add_title: (bool) do not add title if False
+        :add_colorbar: (bool) do not add colorbar if False
+        :cmap: (str, optional) colormap
+        :**kwargs: (keyword arguments) to be passed to mpl_toolkits.basemap.scatter()
+        :return: (basemap) figure
+
+        """
+        # use curret axis if not specified
+        if axis is None:
+            axis = plt.gca()
+        # levels
+        if levels is not None:
+            bounds = np.array(levels)
+            norm = colors.BoundaryNorm(boundaries=bounds, ncolors=256)
+        else:
+            norm = None
+        # depth mode
+        if depth_mode == 'native':
+            depth = np.arange(self.depth.size)
+        elif depth_mode == 'symlog':
+            depth = self.depth
+        elif depth_mode == 'linear':
+            depth = self.depth
+        else:
+            print('Depth mode \'{}\' not supported, using \'linear\' instead.'.format(depth_mode))
+            depth = self.depth
+        # plot type
+        if ptype == 'pcolor':
+            fig = axis.pcolor(self.dist, depth, np.transpose(self.data),
+                    norm=norm, cmap=plt.cm.get_cmap(cmap), **kwargs)
+        elif ptype == 'contourf':
+            fig = axis.contourf(self.dist, depth, np.transpose(self.data), levels=levels, extend='both',
+                    norm=norm, cmap=plt.cm.get_cmap(cmap), **kwargs)
+        elif ptype == 'contour':
+            fig = axis.contour(self.dist, depth, np.transpose(self.data), levels=levels,
+                    norm=norm, **kwargs)
+            axis.clabel(fig, fig.levels, fmt='%1.2f')
+        else:
+            raise ValueError('Plot type {} not supported.'.format(ptype))
+        # update depth scale
+        if depth_mode == 'native':
+            ndepth = self.depth.size
+            plt.gcf().canvas.draw()
+            ticks = axis.get_yticks()
+            idx = [int(item) for item in ticks]
+            depth_label = [str(int(round(self.depth[item]))) for item in idx if item < ndepth]
+            axis.set_yticklabels(depth_label)
+        elif depth_mode == 'symlog':
+            axis.set_yscale('symlog', linthreshy=100)
+            axis.axhline(y=100, linewidth=0.5, color='k')
+            ylims = axis.get_ylim()
+            axis.set_ylim([0, ylims[1]])
+            ticks = [20, 40, 60, 80, 100, 500, 1000, 2000]
+            ticks_new = [item for item in ticks if item < self.depth[-1]]
+            axis.set_yticks(ticks_new)
+        axis.set_xlabel('Distance (km)')
+        axis.set_ylabel('Depth (m)')
+        if invert_yaxis:
+            axis.invert_yaxis()
+        # add title
+        if add_title:
+            axis.set_title('{} ({})'.format(self.name, self.units))
+        # add colorbar
+        if add_colorbar:
+            cb = plt.colorbar(fig, ax=axis)
+            cb.formatter.set_powerlimits((-4, 4))
+            cb.update_ticks()
+        return fig
+
+#--------------------------------
 # MPASODomain
 #--------------------------------
 
@@ -1457,116 +1601,131 @@ class MPASODomain(object):
         axis.set_ylabel('Depth (m)')
         return axis
 
-
 #--------------------------------
-# MPASOVertCrossSection
+# MPASOProfile
 #--------------------------------
 
-class MPASOVertCrossSection(object):
+class MPASOProfile(object):
 
-    """MPASOVertCrossSection object"""
+    """LESProfile object"""
 
-    def __init__(self, data, lon, lat, dist, depth, name, units, bottomdepth=None):
-        """Initialize MPASOCrossSection
+    def __init__(self, time=None, time_name='Time', time_units='s',
+                       z=None, z_name='z', z_units='m',
+                       data=None, data_name=None, data_units=None):
+        """Initialize MPASOProfile
 
-        :data: (1D numpy array) data array
-        :lon: (1D numpy array) longitude array
-        :lat: (1D numpy array) latitude array
-        :dist: (1D numpy array) distance array
-        :depth: (1D numpy array) depth array
-        :bottomdepth: (1D numpy array) depth of bottom
-        :name: (str) name of variable
-        :units: (str) units of variable
+        :time: (1D numpy array/datetime object) time
+        :time_name: (str, optional) name of time
+        :time_units: (str, optional) units of time
+        :z: (1D numpy array) vertical coordinate
+        :z_name: (str) name of z
+        :z_units: (str) units of z
+        :data: (2D numpy array) data at each time and z
+        :data_name: (str) name of variable
+        :data_units: (str) units of variable
 
         """
-        if bottomdepth is not None:
-            for i in np.arange(bottomdepth.size):
-                idxd = depth>bottomdepth[i]
-                data[i,idxd] = np.nan
+        self.time = time
+        self.time_name = time_name
+        self.time_units = time_units
+        self.z = z
+        self.z_name = z_name
+        self.z_units = z_units
         self.data = data
-        self.lon = lon
-        self.lat = lat
-        self.dist = dist
-        self.depth = depth
-        self.bottomdepth = bottomdepth
-        self.name = name
-        self.units = units
+        self.data_name = data_name
+        self.data_units = data_units
+        try:
+            self.data_mean = np.mean(data, axis=0)
+        except TypeError:
+            self.data_mean = None
 
-    def plot(self, axis=None, ptype='contourf', depth_mode='linear', levels=None, add_title=True, add_colorbar=True, invert_yaxis=True, cmap='rainbow', **kwargs):
-        """Plot scatters on a map
+    def plot(self, axis=None, xlim=None, ylim=None,
+                   xlabel=None, ylabel=None, title=None,
+                   ptype='contourf', **kwargs):
+        """Plot the Hovmoller diagram (time - z)
 
         :axis: (matplotlib.axes, optional) axis to plot figure on
-        :ptype: (str) plot type, contourf, pcolor etc.
-        :depth_mode: (str) 'linear', 'native' (native grid) or 'symlog' (linear above 100 m and log below)
-        :leveles: (list, optional) list of levels
-        :add_title: (bool) do not add title if False
-        :add_colorbar: (bool) do not add colorbar if False
-        :cmap: (str, optional) colormap
-        :**kwargs: (keyword arguments) to be passed to mpl_toolkits.basemap.scatter()
-        :return: (basemap) figure
+        :xlim: ([float, float], optional) upper and lower limits of the x-axis
+        :ylim: ([float, float], optional) upper and lower limits of the y-axis
+        :xlabel: (str, optional) x-label, 'Time' by default, 'off' to turn it off
+        :ylabel: (str, optional) y-label, 'Depth (m)' by default, 'off' to turn it off
+        :title: (str, optional) title
+        :ptype: (str, optional) plot type, valid values: contourf (default), pcolor
+        :**kwargs: (keyword arguments) to be passed to matplotlib.pyplot.contourf() or
+                                       matplotlib.pyplot.pcolor() depending on ptype
+        :returns: (matplotlib figure object) figure
 
         """
         # use curret axis if not specified
         if axis is None:
             axis = plt.gca()
-        # levels
-        if levels is not None:
-            bounds = np.array(levels)
-            norm = colors.BoundaryNorm(boundaries=bounds, ncolors=256)
-        else:
-            norm = None
-        # depth mode
-        if depth_mode == 'native':
-            depth = np.arange(self.depth.size)
-        elif depth_mode == 'symlog':
-            depth = self.depth
-        elif depth_mode == 'linear':
-            depth = self.depth
-        else:
-            print('Depth mode \'{}\' not supported, using \'linear\' instead.'.format(depth_mode))
-            depth = self.depth
         # plot type
-        if ptype == 'pcolor':
-            fig = axis.pcolor(self.dist, depth, np.transpose(self.data),
-                    norm=norm, cmap=plt.cm.get_cmap(cmap), **kwargs)
-        elif ptype == 'contourf':
-            fig = axis.contourf(self.dist, depth, np.transpose(self.data), levels=levels, extend='both',
-                    norm=norm, cmap=plt.cm.get_cmap(cmap), **kwargs)
-        elif ptype == 'contour':
-            fig = axis.contour(self.dist, depth, np.transpose(self.data), levels=levels,
-                    norm=norm, **kwargs)
-            axis.clabel(fig, fig.levels, fmt='%1.2f')
+        if ptype == 'contourf':
+            fig = axis.contourf(self.time, self.z, np.transpose(self.data), **kwargs)
+        elif ptype == 'pcolor':
+            fig = axis.pcolor(self.time, self.z, np.transpose(self.data), **kwargs)
         else:
-            raise ValueError('Plot type {} not supported.'.format(ptype))
-        # update depth scale
-        if depth_mode == 'native':
-            ndepth = self.depth.size
-            plt.gcf().canvas.draw()
-            ticks = axis.get_yticks()
-            idx = [int(item) for item in ticks]
-            depth_label = [str(int(round(self.depth[item]))) for item in idx if item < ndepth]
-            axis.set_yticklabels(depth_label)
-        elif depth_mode == 'symlog':
-            axis.set_yscale('symlog', linthreshy=100)
-            axis.axhline(y=100, linewidth=0.5, color='k')
-            ylims = axis.get_ylim()
-            axis.set_ylim([0, ylims[1]])
-            ticks = [20, 40, 60, 80, 100, 500, 1000, 2000]
-            ticks_new = [item for item in ticks if item < self.depth[-1]]
-            axis.set_yticks(ticks_new)
-        axis.set_xlabel('Distance (km)')
-        axis.set_ylabel('Depth (m)')
-        if invert_yaxis:
-            axis.invert_yaxis()
-        # add title
-        if add_title:
-            axis.set_title('{} ({})'.format(self.name, self.units))
-        # add colorbar
-        if add_colorbar:
-            cb = plt.colorbar(fig, ax=axis)
-            cb.formatter.set_powerlimits((-4, 4))
-            cb.update_ticks()
+            raise ValueError('Plot type (ptype) should be \'contourf\' or \'pcolor\', got {}.'.format(ptype))
+        # x- and y-label, turn off by passing in 'off'
+        if xlabel is None:
+            if self.time_units is not None:
+                axis.set_xlabel(self.time_name+' ('+self.time_units+')')
+        else:
+            if xlabel != 'off':
+                axis.set_xlabel(xlabel)
+        if ylabel is None:
+            axis.set_ylabel(self.z_name+' ('+self.z_units+')')
+        else:
+            if ylabel != 'off':
+                axis.set_ylabel(ylabel)
+        # x- and y-limits
+        if xlim is not None:
+            axis.set_xlim(xlim)
+        if ylim is not None:
+            axis.set_ylim(ylim)
+        # return figure
         return fig
+
+    def plot_mean(self, axis=None, norm=1.0, znorm=1.0, xlim=None, ylim=None,
+                        xlabel=None, ylabel=None, title=None, **kwargs):
+        """Plot the mean profile
+
+        :axis: (matplotlib.axes, optional) axis to plot figure on
+        :norm: (float) normalizing factor
+        :znorm: (float) normalizing factor for vertical coordinate
+        :xlim: ([float, float], optional) upper and lower limits of the x-axis
+        :ylim: ([float, float], optional) upper and lower limits of the y-axis
+        :xlabel: (str, optional) x-label, 'self.name' by default, 'off' to turn it off
+        :ylabel: (str, optional) y-label, 'Depth (m)' by default, 'off' to turn it off
+        :title: (str, optional) title
+        :**kwargs: (keyword arguments) to be passed to matplotlib.pyplot.plot()
+        :returns: (matplotlib figure object) figure
+
+        """
+        # use curret axis if not specified
+        if axis is None:
+            axis = plt.gca()
+        # plot figure
+        fig = axis.plot(self.data_mean*norm, self.z*znorm, **kwargs)
+        # x- and y-label, turn off by passing in 'off'
+        if xlabel is None:
+            axis.set_xlabel(self.data_name+' ('+self.data_units+')')
+        else:
+            if xlabel != 'off':
+                axis.set_xlabel(xlabel)
+        if ylabel is None:
+            axis.set_ylabel(self.z_name+' ('+self.z_units+')')
+        else:
+            if ylabel != 'off':
+                axis.set_ylabel(ylabel)
+        # x- and y-limits
+        if xlim is not None:
+            axis.set_xlim(xlim)
+        if ylim is not None:
+            axis.set_ylim(ylim)
+        # return figure
+        return fig
+
 
 #--------------------------------
 # MPASCICEData
