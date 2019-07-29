@@ -543,7 +543,10 @@ class MPASOData(object):
         time = [datetime.strptime(x.strip(), '%Y-%m-%d_%H:%M:%S') for x in xtime]
         # z
         fmesh = self.mesh.load()
-        depth = fmesh.variables['refZMid'][:]
+        if 'LES' in position:
+            depth = fmesh.variables['zLES'][0,0,:]
+        else:
+            depth = fmesh.variables['refZMid'][:]
         # MPASOProfile
         out = MPASOProfile(time=time, time_name='Time', time_units=None,
                            z=depth, z_name='z', z_units='m',
@@ -1343,16 +1346,19 @@ class MPASODomain(object):
             self.position = position
             print("Reading mesh data from {}".format(mesh.filepath))
             fmesh = mesh.load()
-            if position == 'cell':
+            if 'cell' in position:
                 self.x = fmesh.variables['xCell'][:]
                 self.y = fmesh.variables['yCell'][:]
-            elif position == 'vertex':
+            elif 'vertex' in position:
                 self.x = fmesh.variables['xVertex'][:]
                 self.y = fmesh.variables['yVertex'][:]
             else:
                 raise ValueError('Unsupported position \'{}\''.format(position))
             if self.ndim == 2:
-                self.z = fmesh.variables['refZMid'][:]
+                if 'LES' in position:
+                    self.z = fmesh.variables['zLES'][0,0,:]
+                else:
+                    self.z = fmesh.variables['refZMid'][:]
 
     def _pcolor(self, data, axis=None, position='cell', **kwargs):
         assert self.mesh is not None, 'Mesh file required for _pcolor.'
@@ -1366,7 +1372,7 @@ class MPASODomain(object):
         dvEdge_max = dvEdge.max() + dvEdge_small
         x_period = fmesh.x_period
         y_period = fmesh.y_period
-        if position == 'cell':
+        if 'cell' in position:
             verticesOnCell  = fmesh.variables['verticesOnCell'][:]
             nEdgesOnCell    = fmesh.variables['nEdgesOnCell'][:]
             # patches
@@ -1390,7 +1396,7 @@ class MPASODomain(object):
                         elif yp[j] - yc < -dvEdge_max:
                             yp[j] += y_period
                 patches.append(Polygon(list(zip(xp,yp))))
-        elif position == 'vertex':
+        elif 'vertex' in position:
             cellsOnVertex = fmesh.variables['cellsOnVertex'][:]
             nEdgesOnCell    = fmesh.variables['nEdgesOnCell'][:]
             # patches
