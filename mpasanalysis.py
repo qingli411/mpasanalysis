@@ -546,7 +546,12 @@ class MPASOData(object):
         if 'LES' in position:
             depth = fmesh.variables['zLES'][0,0,:]
         else:
-            depth = fmesh.variables['refZMid'][:]
+            if 'refZMid' in fmesh.variables.keys():
+                depth = fmesh.variables['refZMid'][:]
+            elif 'zMid' in fmesh.variables.keys():
+                depth = fmesh.variables['zMid'][0,0,:]
+            else:
+                raise KeyError('Neither refZMid or zMid is found.' )
         # MPASOProfile
         out = MPASOProfile(time=time, time_name='Time', time_units=None,
                            z=depth, z_name='z', z_units='m',
@@ -1358,7 +1363,12 @@ class MPASODomain(object):
                 if 'LES' in position:
                     self.z = fmesh.variables['zLES'][0,0,:]
                 else:
-                    self.z = fmesh.variables['refZMid'][:]
+                    if 'refZMid' in fmesh.variables.keys():
+                        self.z = fmesh.variables['refZMid'][:]
+                    elif 'zMid' in fmesh.variables.keys():
+                        self.z = fmesh.variables['zMid'][0,0,:]
+                    else:
+                        raise KeyError('Neither refZMid or zMid is found.' )
 
     def _pcolor(self, data, axis=None, position='cell', **kwargs):
         assert self.mesh is not None, 'Mesh file required for _pcolor.'
@@ -1801,7 +1811,7 @@ class VerticalTransect(object):
             self.lon1  = 287.5
             self.lat1  = 78.0
             self.depth = 1000.0
-        elif name == 'Parry Channel':
+        elif name == 'Parry Channel' or name == 'Lancaster sound':
             print('Pre-defined transect \'{}\'.'.format(name))
             self.lon0  = 281.2
             self.lat0  = 73.7
