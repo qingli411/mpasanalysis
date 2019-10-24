@@ -1531,7 +1531,7 @@ class MPASODomain(object):
         tree = spatial.KDTree(list(zip(self.x, self.y)))
         p = tree.query(pts)
         cidx = p[1]
-        ax = self._plot_transect(xy=self.x[cidx], xyidx=cidx, **kwargs)
+        ax = self._plot_transect(xy=self.x[cidx], data=self.data[cidx,:], **kwargs)
         ax.set_xlabel('x')
         return ax
 
@@ -1560,16 +1560,80 @@ class MPASODomain(object):
         tree = spatial.KDTree(list(zip(self.x, self.y)))
         p = tree.query(pts)
         cidx = p[1]
-        ax = self._plot_transect(xy=self.y[cidx], xyidx=cidx, **kwargs)
+        ax = self._plot_transect(xy=self.y[cidx], data=self.data[cidx,:], **kwargs)
         ax.set_xlabel('y')
         return ax
 
-    def _plot_transect(self, xy=None, xyidx=None, axis=None, ptype='contourf', levels=None, add_title=True, \
+    def plot_xz_mean(self, **kwargs):
+        """Plot xz-transect of y-mean of a domain
+
+        :axis: (matplotlib.axes, optional) axis to plot figure on
+        :**kwargs: (keyword arguments) arguments
+        :return: (axis) axis of figure
+
+        """
+        xmax = self.x.max()
+        xmin = self.x.min()
+        nc = self.data.shape[0]
+        nz = self.data.shape[1]
+        cellarea = self.mesh.load().variables['areaCell'][:]
+        d_cell = np.sqrt(cellarea.mean())
+        npoints = int(np.ceil((xmax-xmin)/d_cell))
+        print('Average over y at {} bins in x.'.format(npoints))
+        binbnd = np.linspace(xmin, xmax, npoints+1)
+        binwidth = (xmax-xmin)/npoints
+        dsum = np.zeros([npoints, nz])
+        dwgt = np.zeros(npoints)
+        mdata = np.zeros([npoints, nz])
+        for i in np.arange(nc):
+            idx = int((self.x[i]-binbnd[0]-1.e-6)/binwidth)
+            dsum[idx,:] += self.data[i,:]*cellarea[i]
+            dwgt[idx] += cellarea[i]
+        for j in np.arange(nz):
+            mdata[:,j] = dsum[:,j]/dwgt
+        xx = 0.5*(binbnd[0:-1]+binbnd[1:])
+        ax = self._plot_transect(xy=xx, data=mdata, **kwargs)
+        ax.set_xlabel('x')
+        return ax
+
+    def plot_yz_mean(self, **kwargs):
+        """Plot yz-transect of x-mean of a domain
+
+        :axis: (matplotlib.axes, optional) axis to plot figure on
+        :**kwargs: (keyword arguments) arguments
+        :return: (axis) axis of figure
+
+        """
+        ymax = self.y.max()
+        ymin = self.y.min()
+        nc = self.data.shape[0]
+        nz = self.data.shape[1]
+        cellarea = self.mesh.load().variables['areaCell'][:]
+        d_cell = np.sqrt(cellarea.mean())
+        npoints = int(np.ceil((ymax-ymin)/d_cell))
+        print('Average over x at {} bins in y.'.format(npoints))
+        binbnd = np.linspace(ymin, ymax, npoints+1)
+        binwidth = (ymax-ymin)/npoints
+        dsum = np.zeros([npoints, nz])
+        dwgt = np.zeros(npoints)
+        mdata = np.zeros([npoints, nz])
+        for i in np.arange(nc):
+            idx = int((self.y[i]-binbnd[0]-1.e-6)/binwidth)
+            dsum[idx,:] += self.data[i,:]*cellarea[i]
+            dwgt[idx] += cellarea[i]
+        for j in np.arange(nz):
+            mdata[:,j] = dsum[:,j]/dwgt
+        yy = 0.5*(binbnd[0:-1]+binbnd[1:])
+        ax = self._plot_transect(xy=yy, data=mdata, **kwargs)
+        ax.set_xlabel('y')
+        return ax
+
+    def _plot_transect(self, xy=None, data=None, axis=None, ptype='contourf', levels=None, add_title=True, \
                       title=None, add_colorbar=True, cmap='viridis', **kwargs):
         """Plot transect of a domain
 
         :xy: (numpy array) horizontal dimension
-        :xyidx: (int) xy index
+        :data: (int) xy transect data
         :axis: (matplotlib.axes, optional) axis to plot figure on
         :ptype: (str) plot type, scatter, contourf etc.
         :leveles: (list, optional) list of levels
@@ -1584,7 +1648,7 @@ class MPASODomain(object):
         assert self.ndim == 2, '2D domain has no transect.'
         # check input
         assert xy is not None, 'horizontal dimension xy required.'
-        assert xyidx is not None, 'horizonal dimension indices xyidx required.'
+        assert data is not None, 'transect data required.'
         # use curret axis if not specified
         if axis is None:
             axis = plt.gca()
@@ -1594,8 +1658,6 @@ class MPASODomain(object):
             norm = colors.BoundaryNorm(boundaries=bounds, ncolors=256)
         else:
             norm = None
-        # get transect
-        data = self.data[xyidx,:]
         # plot figure
         if ptype == 'contourf':
             fig = axis.contourf(xy, self.z, np.transpose(data), levels=levels, extend='both', \
