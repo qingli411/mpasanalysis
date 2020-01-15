@@ -890,6 +890,28 @@ class MPASOMap(object):
                 else:
                     raise ValueError('Unsupported position \'{}\''.format(position))
 
+    def __sub__(self, other):
+        """Subtract 'other' from an MPASOMap object
+
+        :other: (float, int, or MPASOMap object): object to be subtracted
+        :returns: (MPASOMap object) the modified MPASOMap object
+
+        """
+        if isinstance(other, float) or isinstance(other, int):
+            out = MPASOMap(data=self.data-other, lon=self.lon, lat=self.lat, cellarea=self.cellarea, \
+                           position=self.position, name=self.name, units=self.name, mesh=self.mesh)
+        elif isinstance(other, MPASOMap):
+            assert self.units == other.units, 'MPASOMap has a different unit'
+            assert all(self.lon == other.lon), 'MPASOMap has different Longitude'
+            assert all(self.lat == other.lat), 'MPASOMap has different Latitude'
+            assert self.position == other.position, 'MPASOMap is on different cell position'
+            out = MPASOMap(data=self.data-other.data, lon=self.lon, lat=self.lat, cellarea=self.cellarea, \
+                           position=self.position, name=self.name+' $-$ '+other.name, \
+                           units=self.units, mesh=self.mesh)
+        else:
+            raise TypeError('Subtraction is not defined between an MPASOMap object and a {} object'.format(type(other)))
+        return out
+
     def save(self, filepath):
         """Save MPASOMap object
 
@@ -1688,7 +1710,7 @@ class MPASODomain(object):
 
 class MPASOProfile(object):
 
-    """LESProfile object"""
+    """MPASOProfile object"""
 
     def __init__(self, time=None, time_name='Time', time_units='s',
                        z=None, z_name='z', z_units='m',
@@ -1715,10 +1737,36 @@ class MPASOProfile(object):
         self.data = data
         self.data_name = data_name
         self.data_units = data_units
-        try:
-            self.data_mean = np.mean(data, axis=0)
-        except TypeError:
-            self.data_mean = None
+        # try:
+        #     self.data_mean = np.mean(data, axis=0)
+        # except TypeError:
+        #     self.data_mean = None
+
+    def save(self, path):
+        """Save MPASOProfile object
+
+        :path: (str) path of file to save
+        :returns: none
+
+        """
+        np.savez(path, data=self.data, \
+                 data_name=self.data_name, data_units=self.data_units, \
+                 time=self.time, time_name=self.time_name, time_units=self.time_units, \
+                 z=self.z, z_name=self.z_name, z_units=self.z_units)
+
+    def load(self, path):
+        """Load data to LESProfile object
+
+        :path: (str) path of file to load
+        :returns: (MPASOProfile object)
+
+        """
+        dat = np.load(path)
+        self.__init__(data=dat['data'], \
+                      data_name=str(dat['data_name']), data_units=str(dat['data_units']), \
+                      time=dat['time'], time_name=str(dat['time_name']), time_units=str(dat['time_units']),\
+                      z=dat['z'], z_name=str(dat['z_name']), z_units=str(dat['z_units']))
+        return self
 
     def plot(self, axis=None, xlim=None, ylim=None,
                    xlabel=None, ylabel=None, title=None,
