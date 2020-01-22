@@ -1468,6 +1468,24 @@ class MPASODomain(object):
         out = axis.add_collection(pc)
         return out
 
+    def plot(self, axis=None, ptype='pcolor', levels=None,
+             add_title=True, title=None, add_colorbar=True, cmap='viridis', **kwargs):
+        """Plot horizontal map of a domain
+
+        :axis: (matplotlib.axes, optional) axis to plot figure on
+        :ptype: (str) plot type, scatter, contourf etc.
+        :leveles: (list, optional) list of levels
+        :add_title: (bool) do not add title if False
+        :add_colorbar: (bool) do not add colorbar if False
+        :cmap: (str, optional) colormap
+        :**kwargs: (keyword arguments) other arguments
+        :return: (basemap) figure
+
+        """
+        fig = self.plot_xy(axis=None, ptype='pcolor', levels=None, \
+                  add_title=True, title=None, add_colorbar=True, cmap='viridis', **kwargs)
+        return fig
+
     def plot_xy(self, zidx=0, axis=None, ptype='pcolor', levels=None,
              add_title=True, title=None, add_colorbar=True, cmap='viridis', **kwargs):
         """Plot horizontal map of a domain
