@@ -509,7 +509,9 @@ class MPASOData(object):
         if units is None:
             units = ncdata.units
         ndim = np.ndim(ncdata)
-        if ndim == 2:
+        if ndim == 1:
+            out = MPASODomain(data=ncdata[:], mesh=self.mesh, position=position, name=name, units=units)
+        elif ndim == 2:
             out = MPASODomain(data=ncdata[tidx,:], mesh=self.mesh, position=position, name=name, units=units)
         else:
             out = MPASODomain(data=ncdata[tidx,:,:], mesh=self.mesh, position=position, name=name, units=units)
@@ -1523,7 +1525,7 @@ class MPASODomain(object):
         ymax = self.y.max()
         ymin = self.y.min()
         axis.set_xlim([xmin, xmax])
-        axis.set_ylim([xmin, ymax])
+        axis.set_ylim([ymin, ymax])
         axis.set_xlabel('x')
         axis.set_ylabel('y')
         return fig
