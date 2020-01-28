@@ -534,6 +534,10 @@ class MPASOData(object):
         # data
         fdata = self.load()
         ncdata = fdata.variables[varname]
+        if varname == 'temperatureLES':
+            data = ncdata[tidx_start:tidx_end,idx,:] - 273.15
+        else:
+            data = ncdata[tidx_start:tidx_end,idx,:]
         if name is None:
             name = ncdata.long_name
         if units is None:
@@ -557,7 +561,7 @@ class MPASOData(object):
         # MPASOProfile
         out = MPASOProfile(time=time, time_name='Time', time_units=None,
                            z=depth, z_name='z', z_units='m',
-                           data=ncdata[tidx_start:tidx_end,idx,:], data_name=name, data_units=units)
+                           data=data, data_name=name, data_units=units)
         return out
 
 
@@ -1815,6 +1819,9 @@ class MPASOProfile(object):
             fig = axis.pcolor(self.time, self.z, np.transpose(self.data), **kwargs)
         else:
             raise ValueError('Plot type (ptype) should be \'contourf\' or \'pcolor\', got {}.'.format(ptype))
+        # set title
+        if title is not None:
+            axis.set_title(title)
         # x- and y-label, turn off by passing in 'off'
         if xlabel is None:
             if self.time_units is not None:
