@@ -546,7 +546,7 @@ class MPASOData(object):
         assert ndim == 3, 'Cannot get profile for {:d}-dimensional variable. Stop.'.format(ndim)
         # time
         xtime = chartostring(fdata.variables['xtime'][tidx_start:tidx_end,:])
-        time = [datetime.strptime(x.strip(), '%Y-%m-%d_%H:%M:%S') for x in xtime]
+        time = [datetime.strptime(x.strip().replace('0000', '0001'), '%Y-%m-%d_%H:%M:%S') for x in xtime]
         # z
         fmesh = self.mesh.load()
         if 'LES' in position:
@@ -1487,7 +1487,7 @@ class MPASODomain(object):
 
         """
         fig = self.plot_xy(axis=None, ptype='pcolor', levels=None, \
-                  add_title=True, title=None, add_colorbar=True, cmap='viridis', **kwargs)
+                  add_title=True, title=None, add_colorbar=True, cmap=cmap, **kwargs)
         return fig
 
     def plot_xy(self, zidx=0, axis=None, ptype='pcolor', levels=None,
@@ -1550,6 +1550,68 @@ class MPASODomain(object):
         axis.set_ylim([ymin, ymax])
         axis.set_xlabel('x')
         axis.set_ylabel('y')
+        return fig
+
+    def plot_yx(self, zidx=0, axis=None, ptype='contourf', levels=None,
+             add_title=True, title=None, add_colorbar=True, cmap='viridis', **kwargs):
+        """Plot horizontal map of a domain
+
+        :zidx: (int) z index
+        :axis: (matplotlib.axes, optional) axis to plot figure on
+        :ptype: (str) plot type, scatter, contourf etc.
+        :leveles: (list, optional) list of levels
+        :add_title: (bool) do not add title if False
+        :add_colorbar: (bool) do not add colorbar if False
+        :cmap: (str, optional) colormap
+        :**kwargs: (keyword arguments) other arguments
+        :return: (basemap) figure
+
+        """
+        # use curret axis if not specified
+        if axis is None:
+            axis = plt.gca()
+        # manually mapping levels to the colormap if levels is passed in,
+        if levels is not None:
+            bounds = np.array(levels)
+            norm = colors.BoundaryNorm(boundaries=bounds, ncolors=256)
+        else:
+            norm = None
+        # data
+        if self.ndim == 1:
+            data = self.data
+        elif self.ndim == 2:
+            data = self.data[:,zidx]
+        else:
+            raise ValueError('Dimension mismatch.')
+        # plot type
+        if ptype == 'pcolor':
+            fig = self._pcolor(data=data, axis=axis, position=self.position, norm=norm, \
+                               cmap=plt.cm.get_cmap(cmap), alpha=1.0, **kwargs)
+        elif ptype == 'contourf':
+            fig = axis.tricontourf(self.y, self.x, np.transpose(data), levels=levels, extend='both', \
+                                   norm=norm, cmap=plt.cm.get_cmap(cmap), **kwargs)
+        else:
+            raise ValueError('Plot type {} not supported.'.format(ptype))
+        # add title
+        if add_title:
+            if title is None:
+                axis.set_title('{} ({})'.format(self.name, self.units))
+            else:
+                axis.set_title(title)
+        # add colorbar
+        if add_colorbar:
+            cb = plt.colorbar(fig, ax=axis)
+            cb.formatter.set_powerlimits((-4, 4))
+            cb.update_ticks()
+        # x- and y-limits and x- and y-labels
+        xmax = self.y.max()
+        xmin = self.y.min()
+        ymax = self.x.max()
+        ymin = self.x.min()
+        axis.set_xlim([xmin, xmax])
+        axis.set_ylim([ymin, ymax])
+        axis.set_xlabel('y')
+        axis.set_ylabel('x')
         return fig
 
     def plot_xz(self, yfrac=0.5, **kwargs):
