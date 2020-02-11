@@ -550,12 +550,12 @@ class MPASOData(object):
         # z
         fmesh = self.mesh.load()
         if 'LES' in position:
-            depth = fmesh.variables['zLES'][0,0,:]
+            depth = fmesh.variables['zLES'][0,idx,:]
         else:
             if 'refZMid' in fmesh.variables.keys():
                 depth = fmesh.variables['refZMid'][:]
             elif 'zMid' in fmesh.variables.keys():
-                depth = fmesh.variables['zMid'][0,0,:]
+                depth = fmesh.variables['zMid'][0,idx,:]
             else:
                 raise KeyError('Neither refZMid or zMid is found.' )
         # MPASOProfile
