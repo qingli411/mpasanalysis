@@ -1528,6 +1528,8 @@ class MPASODomain(object):
         elif ptype == 'contourf':
             fig = axis.tricontourf(self.x, self.y, data, levels=levels, extend='both', \
                                    norm=norm, cmap=plt.cm.get_cmap(cmap), **kwargs)
+            # axis.tricontour(self.x, self.y, data, colors='k', levels=levels, extend='both', \
+            #                 norm=norm, **kwargs)
         else:
             raise ValueError('Plot type {} not supported.'.format(ptype))
         # add title
@@ -1590,6 +1592,8 @@ class MPASODomain(object):
         elif ptype == 'contourf':
             fig = axis.tricontourf(self.y, self.x, np.transpose(data), levels=levels, extend='both', \
                                    norm=norm, cmap=plt.cm.get_cmap(cmap), **kwargs)
+            # axis.tricontour(self.y, self.x, np.transpose(data), colors='k', levels=levels, extend='both', \
+            #                        norm=norm, **kwargs)
         else:
             raise ValueError('Plot type {} not supported.'.format(ptype))
         # add title
@@ -1770,6 +1774,8 @@ class MPASODomain(object):
         if ptype == 'contourf':
             fig = axis.contourf(xy, self.z, np.transpose(data), levels=levels, extend='both', \
                                 norm=norm, cmap=plt.cm.get_cmap(cmap), **kwargs)
+            # axis.contour(xy, self.z, np.transpose(data), colors='k', levels=levels, extend='both', \
+            #                     norm=norm, **kwargs)
         elif ptype == 'pcolor':
             fig = axis.pcolor(xy, self.z, np.transpose(data), \
                               norm=norm, cmap=plt.cm.get_cmap(cmap), **kwargs)
@@ -1854,6 +1860,22 @@ class MPASOProfile(object):
                       z=dat['z'], z_name=str(dat['z_name']), z_units=str(dat['z_units']))
         return self
 
+    def ddt(self):
+        """Return the time derivative of MPASOProfile
+        """
+        nt = len(self.time)
+        nz = len(self.z)
+        dtime = np.zeros(nt-1)
+        data = np.zeros([nt-1, nz], type(self.data))
+        for i in np.arange(nt-1):
+            dtime = (self.time[i+1] - self.time[i]).total_seconds()
+            data[i,:] = (self.data[i+1,:]-self.data[i,:])/dtime
+        # MPASOProfile
+        out = MPASOProfile(time=self.time[1:], time_name=self.time_name, time_units=self.time_units,
+                           z=self.z, z_name=self.z_name, z_units=self.z_units,
+                           data=data, data_name='ddt '+self.data_name, data_units=self.data_units+'/s')
+        return out
+
     def plot(self, axis=None, xlim=None, ylim=None,
                    xlabel=None, ylabel=None, title=None,
                    ptype='contourf', **kwargs):
@@ -1877,6 +1899,7 @@ class MPASOProfile(object):
         # plot type
         if ptype == 'contourf':
             fig = axis.contourf(self.time, self.z, np.transpose(self.data), **kwargs)
+            # axis.contour(self.time, self.z, np.transpose(self.data), colors='k', **kwargs)
         elif ptype == 'pcolor':
             fig = axis.pcolor(self.time, self.z, np.transpose(self.data), **kwargs)
         else:
