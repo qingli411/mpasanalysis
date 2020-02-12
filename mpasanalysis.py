@@ -550,12 +550,12 @@ class MPASOData(object):
         # z
         fmesh = self.mesh.load()
         if 'LES' in position:
-            depth = fmesh.variables['zLES'][0,0,:]
+            depth = fmesh.variables['zLES'][0,idx,:]
         else:
             if 'refZMid' in fmesh.variables.keys():
                 depth = fmesh.variables['refZMid'][:]
             elif 'zMid' in fmesh.variables.keys():
-                depth = fmesh.variables['zMid'][0,0,:]
+                depth = fmesh.variables['zMid'][0,idx,:]
             else:
                 raise KeyError('Neither refZMid or zMid is found.' )
         # MPASOProfile
@@ -1878,7 +1878,7 @@ class MPASOProfile(object):
 
     def plot(self, axis=None, xlim=None, ylim=None,
                    xlabel=None, ylabel=None, title=None,
-                   ptype='contourf', **kwargs):
+                   ptype='contourf', levels=None, cmap='viridis', **kwargs):
         """Plot the Hovmoller diagram (time - z)
 
         :axis: (matplotlib.axes, optional) axis to plot figure on
@@ -1888,6 +1888,8 @@ class MPASOProfile(object):
         :ylabel: (str, optional) y-label, 'Depth (m)' by default, 'off' to turn it off
         :title: (str, optional) title
         :ptype: (str, optional) plot type, valid values: contourf (default), pcolor
+        :leveles: (list, optional) list of levels
+        :cmap: (str, optional) colormap
         :**kwargs: (keyword arguments) to be passed to matplotlib.pyplot.contourf() or
                                        matplotlib.pyplot.pcolor() depending on ptype
         :returns: (matplotlib figure object) figure
@@ -1896,12 +1898,19 @@ class MPASOProfile(object):
         # use curret axis if not specified
         if axis is None:
             axis = plt.gca()
+        if levels is not None:
+            # manually mapping levels to the colormap if levels is passed in,
+            bounds = np.array(levels)
+            norm = colors.BoundaryNorm(boundaries=bounds, ncolors=256)
+        else:
+            norm = None
         # plot type
         if ptype == 'contourf':
-            fig = axis.contourf(self.time, self.z, np.transpose(self.data), **kwargs)
-            # axis.contour(self.time, self.z, np.transpose(self.data), colors='k', **kwargs)
+            fig = axis.contourf(self.time, self.z, np.transpose(self.data), levels=levels, extend='both', \
+                                norm=norm, cmap=plt.cm.get_cmap(cmap), **kwargs)
         elif ptype == 'pcolor':
-            fig = axis.pcolor(self.time, self.z, np.transpose(self.data), **kwargs)
+            fig = axis.pcolor(self.time, self.z, np.transpose(self.data), \
+                              norm=norm, cmap=plt.cm.get_cmap(cmap), **kwargs)
         else:
             raise ValueError('Plot type (ptype) should be \'contourf\' or \'pcolor\', got {}.'.format(ptype))
         # set title
