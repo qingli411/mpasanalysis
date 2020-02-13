@@ -1468,7 +1468,8 @@ class MPASODomain(object):
         # plot patch collection
         pc = PatchCollection(patches, **kwargs)
         pc.set_array(data)
-        pc.set_lw(0.1)
+        if len(patches) > 64:
+            pc.set_linewidth(0.1)
         out = axis.add_collection(pc)
         return out
 
@@ -1590,7 +1591,7 @@ class MPASODomain(object):
             fig = self._pcolor(data=data, axis=axis, position=self.position, norm=norm, \
                                cmap=plt.cm.get_cmap(cmap), alpha=1.0, **kwargs)
         elif ptype == 'contourf':
-            fig = axis.tricontourf(self.y, self.x, np.transpose(data), levels=levels, extend='both', \
+            fig = axis.tricontourf(self.y, self.x, data, levels=levels, extend='both', \
                                    norm=norm, cmap=plt.cm.get_cmap(cmap), **kwargs)
             # axis.tricontour(self.y, self.x, np.transpose(data), colors='k', levels=levels, extend='both', \
             #                        norm=norm, **kwargs)
