@@ -1115,7 +1115,7 @@ class MPASOMap(object):
         return out
 
     def plot(self, axis=None, region='Global', ptype='contourf', mask_nan=False, levels=None,
-             label=None, add_title=True, title=None, add_colorbar=True, cmap='rainbow', **kwargs):
+             label=None, add_title=True, title=None, add_colorbar=True, cmap='rainbow', projection=None, **kwargs):
         """Plot scatters on a map
 
         :axis: (matplotlib.axes, optional) axis to plot figure on
@@ -1126,6 +1126,7 @@ class MPASOMap(object):
         :add_title: (bool) do not add title if False
         :add_colorbar: (bool) do not add colorbar if False
         :cmap: (str, optional) colormap
+        :projection: (str, optional) projection type
         :**kwargs: (keyword arguments) other arguments
         :return: (basemap) figure
 
@@ -1135,7 +1136,7 @@ class MPASOMap(object):
             axis = plt.gca()
         # print message
         print('Plotting map of {} at region \'{}\''.format(self.name+' ('+self.units+')', region))
-        m = plot_basemap(region=region, axis=axis)
+        m = plot_basemap(region=region, axis=axis, projection=projection)
         # mask out nan
         nan_mask = (~ np.isnan(self.data))
         # process data
@@ -2126,6 +2127,8 @@ def region_latlon(region_name):
         rg = region(lon_ll=296.0, lat_ll=46.0, lon_ur=356.0, lat_ur=85.0)
     elif region_name == 'test':
         rg = region(lon_ll=310.0, lat_ll=55.0, lon_ur=320.0, lat_ur=65.0)
+    elif region_name == 'TropicalPacific':
+        rg = region(lon_ll=130.0, lat_ll=-20.0, lon_ur=290.0, lat_ur=20.0)
     else:
         raise ValueError('Region {} not supported.'.format(region_name))
     return rg
@@ -2247,7 +2250,7 @@ def gc_interpolate(lon0, lat0, lon1, lat1, npoints):
     lon_out = np.arctan2(y, x)
     return np.degrees(lon_out), np.degrees(lat_out)
 
-def plot_basemap(region='Global', axis=None):
+def plot_basemap(region='Global', axis=None, projection=None):
     # use curret axis if not specified
     if axis is None:
         axis = plt.gca()
@@ -2264,12 +2267,14 @@ def plot_basemap(region='Global', axis=None):
         mdlat = 30.0
         mdlon = 60.0
     else:
+        if projection is None:
+            projection = 'cass'
         # regional map
         region_obj = region_latlon(region)
         lon_ll, lat_ll, lon_ur, lat_ur = region_obj.lon_ll, region_obj.lat_ll, region_obj.lon_ur, region_obj.lat_ur
         lon_c = 0.5*(lon_ll+lon_ur)
         lat_c = 0.5*(lat_ll+lat_ur)
-        m = Basemap(projection='cass', llcrnrlon=lon_ll, llcrnrlat=lat_ll,
+        m = Basemap(projection=projection, llcrnrlon=lon_ll, llcrnrlat=lat_ll,
                 urcrnrlon=lon_ur, urcrnrlat=lat_ur, resolution='l', lon_0=lon_c, lat_0=lat_c, ax=axis)
         # parallels and meridians
         mdlat = 10.0
