@@ -1159,13 +1159,18 @@ class MPASOMap(object):
             lonmin = np.mod(m.lonmin, 360)
             latmax = m.latmax
             latmin = m.latmin
-            lon_mask = (self.lon <= lonmax) & (self.lon >= lonmin)
+            if lonmax > lonmin:
+                lon_mask = (self.lon <= lonmax) & (self.lon >= lonmin)
+            else:
+                lon_mask = (self.lon <= lonmax) | (self.lon >= lonmin)
             lat_mask = (self.lat <= latmax) & (self.lat >= latmin)
             region_mask = lon_mask & lat_mask & nan_mask
             # apply region mask to data
             data = self.data[region_mask]
             lat = self.lat[region_mask]
             lon = self.lon[region_mask]
+            if lonmax < lonmin:
+                lon[lon<lonmax] = lon[lon<lonmax]+360.0
             cellarea = self.cellarea[region_mask]
         if levels is not None:
             # manually mapping levels to the colormap if levels is passed in,
@@ -2129,6 +2134,8 @@ def region_latlon(region_name):
         rg = region(lon_ll=310.0, lat_ll=55.0, lon_ur=320.0, lat_ur=65.0)
     elif region_name == 'TropicalPacific':
         rg = region(lon_ll=130.0, lat_ll=-20.0, lon_ur=290.0, lat_ur=20.0)
+    elif region_name == 'TropicalAtlantic':
+        rg = region(lon_ll=320.0, lat_ll=-20.0, lon_ur=370.0, lat_ur=20.0)
     else:
         raise ValueError('Region {} not supported.'.format(region_name))
     return rg
