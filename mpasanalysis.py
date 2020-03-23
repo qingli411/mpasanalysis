@@ -49,7 +49,7 @@ class MPASMesh(object):
         cellsOnEdge = fmesh.variables['cellsOnEdge'][:]
         ncell, nec = edgesOnCell.shape
         edge_sign_on_cell = np.zeros([ncell,nec])
-        for i, in np.arange(ncell):
+        for i in np.arange(ncell):
             for j in np.arange(nEdgesOnCell[i]):
                 idx_e = edgesOnCell[i,j]-1
                 if indexToCellID[i] == cellsOnEdge[idx_e, 0]:
