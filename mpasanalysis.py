@@ -2273,6 +2273,11 @@ def plot_basemap(region='Global', axis=None, projection=None):
         # parallels and meridians
         mdlat = 30.0
         mdlon = 60.0
+    elif region == 'Arctic':
+        m = Basemap(projection='npaeqd',boundinglat=40,lon_0=270,resolution='l')
+        # parallels and meridians
+        mdlat = 20.0
+        mdlon = 20.0
     else:
         if projection is None:
             projection = 'cass'
